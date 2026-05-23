@@ -1,0 +1,213 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Мониторинг заявок</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: system-ui;
+            margin: 20px;
+            background: #f5f7fa
+        }
+
+        .box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,.1);
+            max-width: 800px;
+            margin: auto
+        }
+
+        input, select, textarea, button {
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px
+        }
+
+        button {
+            background: #0d6efd;
+            color: #fff;
+            border: none;
+            cursor: pointer
+        }
+
+            button:hover {
+                background: #0b5ed7
+            }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px
+        }
+
+        .tab {
+            cursor: pointer;
+            padding: 8px 15px;
+            background: #e9ecef;
+            border-radius: 4px
+        }
+
+            .tab.active {
+                background: #0d6efd;
+                color: #fff
+            }
+
+        .ticket {
+            border-left: 4px solid #0d6efd;
+            padding: 10px;
+            margin: 10px 0;
+            background: #fff
+        }
+
+        .hidden {
+            display: none
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto
+        }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>🎫 Система мониторинга</h2>
+        <div id="auth">
+            <input id="u" placeholder="Логин"><input type="password" id="p" placeholder="Пароль">
+            <button onclick="login()">Войти</button>
+        </div>
+        <div id="app" class="hidden">
+            <button onclick="logout()" style="width:auto;float:right">Выйти</button>
+            <div class="tabs">
+                <div class="tab active" onclick="sw('tickets')">Заявки</div>
+                <div class="tab" onclick="sw('stats')">Статистика</div>
+            </div>
+            <div id="tickets">
+                <button onclick="load()">Обновить список</button>
+                <div id="list"></div>
+                <hr><h4>Новая заявка</h4>
+                <input id="t" placeholder="Заголовок"><textarea id="d" placeholder="Описание"></textarea>
+                <select id="pr"><option value="0">Низкий</option><option value="1" selected>Средний</option><option value="2">Высокий</option><option value="3">Критический</option></select>
+                <button onclick="create()">Создать</button>
+            </div>
+            <div id="stats" class="hidden">
+                <button onclick="loadStats()">Обновить аналитику</button>
+                <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:15px">
+                    <canvas id="c1"></canvas><canvas id="c2"></canvas>
+                </div>
+                <p id="avg"></p>
+            </div>
+        </div>
+    </div>
+    <script>
+        const A = '/api';
+
+        async function login() {
+            const r = await fetch(`${A}/Auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',  // 🔹 Обязательно для cookie-аутентификации
+                body: JSON.stringify({
+                    username: document.getElementById('u').value,  // 🔹 camelCase (стандарт JSON)
+                    password: document.getElementById('p').value
+                })
+            });
+
+            // Читаем ответ как текст, чтобы показать ошибку, если она есть
+            const txt = await r.text();
+
+            if (r.ok) {
+                document.getElementById('auth').classList.add('hidden');
+                document.getElementById('app').classList.remove('hidden');
+                load();
+            } else {
+                // Пытаемся распарсить ошибку, если это JSON
+                try {
+                    const err = JSON.parse(txt);
+                    alert('Ошибка: ' + (err.message || err.title || txt));
+                } catch {
+                    alert('Ошибка входа: ' + txt);
+                }
+            }
+        }
+
+        async function logout() {
+            await fetch(`${A}/Auth/logout`, { method: 'POST', credentials: 'include' });
+            location.reload();
+        }
+
+        async function load() {
+            const r = await fetch(`${A}/Tickets`, { credentials: 'include' });
+            const d = await r.json();
+            document.getElementById('list').innerHTML = d.map(t =>
+                `<div class="ticket">
+                <b>#${t.id} ${t.title}</b> [${t.status}] | ${t.priority}<br>
+                Создатель: ${t.createdByName} | Исполнитель: ${t.assignedToName || '-'}<br>
+                <button onclick="ch(${t.id},'InProgress')" style="width:auto">В работу</button>
+                <button onclick="ch(${t.id},'Closed')" style="width:auto">Закрыть</button>
+            </div>`
+            ).join('');
+        }
+
+        async function create() {
+            const r = await fetch(`${A}/Tickets`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    title: document.getElementById('t').value,
+                    description: document.getElementById('d').value,
+                    priority: +document.getElementById('pr').value
+                })
+            });
+            if (r.ok) {
+                load();
+                document.getElementById('t').value = '';
+                document.getElementById('d').value = '';
+            }
+        }
+
+        async function ch(id, st) {
+            await fetch(`${A}/Tickets/${id}/status`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ newStatus: st })
+            });
+            load();
+        }
+
+        function sw(t) {
+            document.getElementById('tickets').classList.toggle('hidden', t !== 'tickets');
+            document.getElementById('stats').classList.toggle('hidden', t !== 'stats');
+            document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+            event.target.classList.add('active');
+            if (t === 'stats') loadStats();
+        }
+
+        let c1, c2;
+        async function loadStats() {
+            const r = await fetch(`${A}/Tickets/stats`, { credentials: 'include' });
+            const s = await r.json();
+            document.getElementById('avg').innerText = `⏱ Среднее время закрытия: ${s.avgResolutionHours} ч.`;
+            if (c1) c1.destroy(); if (c2) c2.destroy();
+            c1 = new Chart(document.getElementById('c1'), {
+                type: 'doughnut',
+                data: { labels: Object.keys(s.byStatus), datasets: [{ data: Object.values(s.byStatus), backgroundColor: ['#0d6efd', '#ffc107', '#28a745', '#6c757d'] }] }
+            });
+            c2 = new Chart(document.getElementById('c2'), {
+                type: 'bar',
+                data: { labels: Object.keys(s.byPriority), datasets: [{ label: 'Заявок', data: Object.values(s.byPriority), backgroundColor: '#17a2b8' }] }
+            });
+        }
+    </script>
+
+
+</body>
+</html>
