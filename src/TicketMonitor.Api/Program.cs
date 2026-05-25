@@ -1,6 +1,10 @@
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TicketMonitor.Api.Middleware;
+using TicketMonitor.Api.Validators;
 using TicketMonitor.Core.Entities;
 using TicketMonitor.Core.Interfaces;
 using TicketMonitor.Infrastructure.Data;
@@ -41,6 +45,28 @@ namespace TicketMonitor.Api
                     // 🔹 Опционально: выводим ответ в camelCase (стандарт JSON)
                     opt.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
                 });
+            builder.Services.Configure<ApiBehaviorOptions>(options =>
+            {
+                options.InvalidModelStateResponseFactory = context =>
+                {
+                    var errors = context.ModelState
+                        .Where(x => x.Value?.Errors.Count > 0)
+                        .Select(x => new
+                        {
+                            Field = x.Key,
+                            Errors = x.Value!.Errors
+                                .Select(e => e.ErrorMessage)
+                        });
+
+                    return new BadRequestObjectResult(new
+                    {
+                        Message = "Ошибка валидации данных",
+                        Errors = errors
+                    });
+                };
+            });
+            builder.Services.AddFluentValidationAutoValidation();
+            builder.Services.AddValidatorsFromAssemblyContaining<CreateTicketValidator>();
             var app = builder.Build();
 
             app.UseMiddleware<ExceptionMiddleware>();

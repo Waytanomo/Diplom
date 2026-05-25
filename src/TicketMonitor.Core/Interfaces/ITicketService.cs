@@ -4,7 +4,9 @@ namespace TicketMonitor.Core.Interfaces
 {
     public interface ITicketService
     {
-        Task<IEnumerable<TicketDto>> GetAllAsync();
+        Task<IEnumerable<TicketDto>> GetAllAsync(
+            int page = 1,
+            int pageSize = 10);
         Task<TicketDto?> GetByIdAsync(int id);
         Task<TicketDto> CreateAsync(CreateTicketDto dto, string userId);
         Task<bool> ChangeStatusAsync(int id, ChangeStatusDto dto, string userId);

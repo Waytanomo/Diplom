@@ -21,19 +21,20 @@ namespace TicketMonitor.Infrastructure.Data
                 e.Property(t => t.RowVersion).IsRowVersion();
                 e.HasOne(t => t.CreatedBy).WithMany().HasForeignKey(t => t.CreatedById).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(t => t.AssignedTo).WithMany().HasForeignKey(t => t.AssignedToId).OnDelete(DeleteBehavior.SetNull);
-                e.HasQueryFilter(x => !x.IsDeleted);
-            });
+                e.HasQueryFilter(x => !x.IsDeleted);            });
 
             builder.Entity<Comment>(e =>
             {
                 e.HasOne(c => c.Ticket).WithMany(t => t.Comments).HasForeignKey(c => c.TicketId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(c => c.Author).WithMany().HasForeignKey(c => c.AuthorId).OnDelete(DeleteBehavior.Restrict);
+                e.HasQueryFilter(c => !c.Ticket.IsDeleted);
             });
 
             builder.Entity<StatusLog>(e =>
             {
                 e.HasOne(s => s.Ticket).WithMany(t => t.StatusLogs).HasForeignKey(s => s.TicketId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(s => s.ChangedBy).WithMany().HasForeignKey(s => s.ChangedById).OnDelete(DeleteBehavior.Restrict);
+                e.HasQueryFilter(s => !s.Ticket.IsDeleted);
             });
         }
     }
