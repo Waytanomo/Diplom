@@ -17,6 +17,8 @@ namespace TicketMonitor.Core.Entities
         public DateTime? ClosedAt { get; set; }
         public string CreatedById { get; set; } = string.Empty;
         public string? AssignedToId { get; set; }
+        public bool IsDeleted { get; set; } = false;
+        public DateTime? DeletedAt { get; set; }
         public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
         public ApplicationUser CreatedBy { get; set; } = null!;

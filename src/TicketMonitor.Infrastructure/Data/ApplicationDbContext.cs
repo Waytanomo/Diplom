@@ -21,6 +21,7 @@ namespace TicketMonitor.Infrastructure.Data
                 e.Property(t => t.RowVersion).IsRowVersion();
                 e.HasOne(t => t.CreatedBy).WithMany().HasForeignKey(t => t.CreatedById).OnDelete(DeleteBehavior.Restrict);
                 e.HasOne(t => t.AssignedTo).WithMany().HasForeignKey(t => t.AssignedToId).OnDelete(DeleteBehavior.SetNull);
+                e.HasQueryFilter(x => !x.IsDeleted);
             });
 
             builder.Entity<Comment>(e =>

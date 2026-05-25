@@ -1,41 +1,58 @@
-var builder = WebApplication.CreateBuilder(args);
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using TicketMonitor.Api.Middleware;
+using TicketMonitor.Core.Entities;
+using TicketMonitor.Core.Interfaces;
+using TicketMonitor.Infrastructure.Data;
+using TicketMonitor.Infrastructure.Services;
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+namespace TicketMonitor.Api
 {
-    app.MapOpenApi();
-}
+    public class Program
+    {
+        public static void Main(string[] args)
+        {
 
-app.UseHttpsRedirection();
+            var builder = WebApplication.CreateBuilder(args);
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+            builder.Services.AddDbContext<ApplicationDbContext>(opt =>
+                opt.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+            builder.Services.AddIdentity<ApplicationUser, IdentityRole>(opt => {
+                opt.Password.RequireDigit = false;
+                opt.Password.RequiredLength = 6;
+                opt.Password.RequireNonAlphanumeric = false;
+                opt.Password.RequireUppercase = false;
+            })
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
 
-app.Run();
+            builder.Services.ConfigureApplicationCookie(opt => {
+                opt.Events.OnRedirectToLogin = ctx => { ctx.Response.StatusCode = 401; return Task.CompletedTask; };
+                opt.Events.OnRedirectToAccessDenied = ctx => { ctx.Response.StatusCode = 403; return Task.CompletedTask; };
+            });
 
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+            builder.Services.AddScoped<ITicketService, TicketService>();
+            builder.Services.AddHostedService<RoleInitializer>();
+            builder.Services.AddControllers()
+                .AddJsonOptions(opt => {
+                    // 🔹 Разрешаем case-insensitive привязку: фронтенд может слать camelCase
+                    opt.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                    // 🔹 Опционально: выводим ответ в camelCase (стандарт JSON)
+                    opt.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+                });
+            var app = builder.Build();
+
+            app.UseMiddleware<ExceptionMiddleware>();
+            app.UseRouting();
+            app.UseAuthentication();
+            app.UseAuthorization();
+            app.UseStaticFiles(); // ✅ Только здесь, без builder.Services
+
+            app.MapDefaultControllerRoute();
+            app.MapFallbackToFile("index.html");
+
+            app.Run();
+        }
+    }
 }

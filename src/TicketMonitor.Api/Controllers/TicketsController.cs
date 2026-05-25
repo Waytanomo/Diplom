@@ -43,5 +43,12 @@ namespace TicketMonitor.Api.Controllers
         [HttpGet("stats")]
         [Authorize(Roles = "Administrator,Manager")]
         public async Task<IActionResult> GetStats() => Ok(await _svc.GetStatsAsync());
+
+        /*[HttpDelete("{id}/delete")]
+        [Authorize(Roles = "Manager, Administrator")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var res =
+        }*/
     }
 }

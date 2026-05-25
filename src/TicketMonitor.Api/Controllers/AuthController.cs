@@ -45,7 +45,7 @@ namespace TicketMonitor.Api.Controllers
             var result = await _signInManager.PasswordSignInAsync(
                 request.Username,
                 request.Password,
-                isPersistent: false,
+                isPersistent: true,
                 lockoutOnFailure: false);
 
             return result.Succeeded

@@ -1,7 +1,7 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/TicketMonitor.Api/TicketMonitor.Api.csproj" />
     <Project Path="src/TicketMonitor.Core/TicketMonitor.Core.csproj" />
     <Project Path="src/TicketMonitor.Infrastructure/TicketMonitor.Infrastructure.csproj" />
-    <Project Path="TicketMonitor.Api/TicketMonitor.Api.csproj" Id="10763746-40cb-43e4-8769-ea3d1640b244" />
   </Folder>
 </Solution>

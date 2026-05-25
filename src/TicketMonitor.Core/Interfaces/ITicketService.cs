@@ -11,5 +11,6 @@ namespace TicketMonitor.Core.Interfaces
         Task<bool> AssignAsync(int id, AssignTicketDto dto, string userId);
         Task<CommentDto> AddCommentAsync(int id, AddCommentDto dto, string userId);
         Task<TicketStatsDto> GetStatsAsync();
+        Task<bool> DeleteAsync(int id, string userId);
     }
 }
