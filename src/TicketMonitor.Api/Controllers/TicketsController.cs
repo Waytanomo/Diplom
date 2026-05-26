@@ -41,7 +41,7 @@ namespace TicketMonitor.Api.Controllers
         }
 
         [HttpPost]
-        [Authorize(Roles = "Manager,Client")]
+        [Authorize(Roles = "Manager,Client,Administrator")]
         public async Task<IActionResult> Create([FromBody] CreateTicketDto dto)
         {
             var res = await _svc.CreateAsync(dto, UserId);

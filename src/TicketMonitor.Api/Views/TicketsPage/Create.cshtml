@@ -1,0 +1,156 @@
+﻿@{
+    ViewData["Title"] = "Create Ticket";
+}
+
+<div class="row justify-content-center">
+
+    <div class="col-md-8">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body p-4">
+
+                <h2 class="mb-4">
+                    Create Ticket
+                </h2>
+
+                <div id="errorMessage"
+                     class="alert alert-danger d-none">
+                </div>
+
+                <form id="createTicketForm">
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Title
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               id="title"
+                               required />
+
+                    </div>
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Description
+                        </label>
+
+                        <textarea class="form-control"
+                                  id="description"
+                                  rows="6"
+                                  required></textarea>
+
+                    </div>
+
+                    <div class="mb-4">
+
+                        <label class="form-label">
+                            Priority
+                        </label>
+
+                        <select class="form-select"
+                                id="priority">
+
+                            <option value="0">
+                                Low
+                            </option>
+
+                            <option value="1">
+                                Medium
+                            </option>
+
+                            <option value="2">
+                                High
+                            </option>
+
+                            <option value="3">
+                                Critical
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                    <button type="submit"
+                            class="btn btn-success">
+                        Create
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+@section Scripts {
+
+    <script>
+
+        document
+            .getElementById('createTicketForm')
+            .addEventListener('submit', async function (e) {
+
+                e.preventDefault();
+
+                const token = localStorage.getItem('token');
+
+                const errorBox =
+                    document.getElementById('errorMessage');
+
+                errorBox.classList.add('d-none');
+
+                const title =
+                    document.getElementById('title').value;
+
+                const description =
+                    document.getElementById('description').value;
+
+                const priority =
+                    parseInt(document.getElementById('priority').value);
+
+                const response = await fetch('/api/tickets', {
+
+                    method: 'POST',
+
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+
+                    body: JSON.stringify({
+                        title,
+                        description,
+                        priority
+                    })
+                });
+
+                if (!response.ok) {
+
+                    const error =
+                        await response.text();
+
+                    console.error(error);
+
+                    errorBox.innerText =
+                        'Failed to create ticket';
+
+                    errorBox.classList.remove('d-none');
+
+                    return;
+                }
+
+                window.location.href =
+                    '/TicketsPage';
+            });
+
+    </script>
+
+}

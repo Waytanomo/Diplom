@@ -38,7 +38,7 @@ namespace TicketMonitor.Api
 
             builder.Services.AddScoped<ITicketService, TicketService>();
             builder.Services.AddHostedService<RoleInitializer>();
-            builder.Services.AddControllers()
+            builder.Services.AddControllersWithViews()
                 .AddJsonOptions(opt => {
                     // 🔹 Разрешаем case-insensitive привязку: фронтенд может слать camelCase
                     opt.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
@@ -73,10 +73,15 @@ namespace TicketMonitor.Api
             app.UseRouting();
             app.UseAuthentication();
             app.UseAuthorization();
-            app.UseStaticFiles(); // ✅ Только здесь, без builder.Services
+            app.UseHttpsRedirection();
+            app.UseStaticFiles();
 
-            app.MapDefaultControllerRoute();
-            app.MapFallbackToFile("index.html");
+            app.MapControllerRoute(
+                name: "default",
+                pattern: "{controller=HomePage}/{action=Index}/{id?}");
+            //app.MapDefaultControllerRoute();
+            //app.MapFallbackToFile("index.html");
+            app.MapControllers();
 
             app.Run();
         }

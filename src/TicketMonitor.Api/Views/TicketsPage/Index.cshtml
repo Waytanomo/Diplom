@@ -1,0 +1,92 @@
+﻿@{
+    ViewData["Title"] = "Tickets";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+    <h1>
+        Tickets
+    </h1>
+
+    <a class="btn btn-primary"
+           asp-controller="TicketsPage"
+           asp-action="Create">
+        Create Ticket
+    </a>
+
+</div>
+
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <table class="table table-hover">
+
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+
+            <tbody id="ticketsTableBody">
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+@section Scripts {
+
+<script>
+
+async function loadTickets() {
+
+    const token = localStorage.getItem('token');
+
+    const response = await fetch('/api/tickets', {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+
+        console.error('Failed to load tickets');
+
+        return;
+    }
+
+    const tickets = await response.json();
+
+    console.log(tickets);
+
+    const tableBody =
+        document.getElementById('ticketsTableBody');
+
+    tableBody.innerHTML = '';
+
+    tickets.forEach(ticket => {
+
+        const row = document.createElement('tr');
+
+        row.innerHTML = `
+            <td>${ticket.title}</td>
+            <td>${ticket.status}</td>
+            <td>${ticket.priority}</td>
+            <td>${new Date(ticket.createdAt).toLocaleDateString()}</td>
+        `;
+
+        tableBody.appendChild(row);
+    });
+}
+
+loadTickets();
+
+</script>
+
+}

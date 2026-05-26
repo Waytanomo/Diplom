@@ -1,0 +1,118 @@
+﻿@{
+    ViewData["Title"] = "Login";
+}
+
+<div class="row justify-content-center">
+
+    <div class="col-md-5">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body p-4">
+
+                <h2 class="text-center mb-4">
+                    Login
+                </h2>
+
+                <div id="errorMessage"
+                     class="alert alert-danger d-none">
+                </div>
+
+                <form id="loginForm">
+
+                    <div class="mb-3">
+
+                        <label class="form-label">
+                            Username
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               id="username"
+                               required />
+
+                    </div>
+
+                    <div class="mb-4">
+
+                        <label class="form-label">
+                            Password
+                        </label>
+
+                        <input type="password"
+                               class="form-control"
+                               id="password"
+                               required />
+
+                    </div>
+
+                    <button type="submit"
+                            class="btn btn-primary w-100">
+                        Login
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+@section Scripts {
+
+    <script>
+
+        document
+            .getElementById('loginForm')
+            .addEventListener('submit', async function (e) {
+
+                e.preventDefault();
+
+                const errorBox =
+                    document.getElementById('errorMessage');
+
+                errorBox.classList.add('d-none');
+
+                const userName =
+                    document.getElementById('username').value;
+
+                const password =
+                    document.getElementById('password').value;
+
+                const response = await fetch('/api/auth/login', {
+
+                    method: 'POST',
+
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+
+                    body: JSON.stringify({
+                        userName,
+                        password
+                    })
+                });
+
+                if (!response.ok) {
+
+                    errorBox.innerText =
+                        'Invalid username or password';
+
+                    errorBox.classList.remove('d-none');
+
+                    return;
+                }
+
+                const data = await response.json();
+
+                localStorage.setItem('token', data.token);
+
+                window.location.href = '/DashboardPage';
+            });
+
+    </script>
+
+}

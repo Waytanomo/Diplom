@@ -58,7 +58,12 @@ namespace TicketMonitor.Infrastructure.Services
 
             await _context.SaveChangesAsync();
 
-            return MapToDto(ticket);
+            var createdTicket = await _context.Tickets
+                .Include(t => t.CreatedBy)
+                .Include(t => t.AssignedTo)
+                .FirstAsync(t => t.Id == ticket.Id);
+
+            return MapToDto(createdTicket);
         }
 
         public async Task<bool> ChangeStatusAsync(int id, ChangeStatusDto dto, string userId)
@@ -201,14 +206,14 @@ namespace TicketMonitor.Infrastructure.Services
         }
 
         private static TicketDto MapToDto(Ticket t) => new(
-            t.Id,
-            t.Title,
-            t.Description,
-            t.Status,
-            t.Priority,
-            t.CreatedAt,
-            t.ClosedAt,
-            t.AssignedTo?.UserName,
-            t.CreatedBy.UserName ?? "Unknown");
+    t.Id,
+    t.Title,
+    t.Description,
+    t.Status,
+    t.Priority,
+    t.CreatedAt,
+    t.ClosedAt,
+    t.AssignedTo?.UserName,
+    t.CreatedBy?.UserName ?? "Unknown");
     }
 }

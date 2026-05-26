@@ -1,0 +1,56 @@
+﻿@{
+    ViewData["Title"] = "Create User";
+}
+
+<div class="row justify-content-center">
+
+    <div class="col-md-6">
+
+        <div class="card shadow-sm">
+
+            <div class="card-body p-4">
+
+                <h2 class="mb-4">
+                    Create User
+                </h2>
+
+                <form id="createUserForm">
+
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text"
+                               class="form-control"
+                               id="username"
+                               required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email"
+                               class="form-control"
+                               id="email"
+                               required />
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Password</label>
+                        <input type="password"
+                               class="form-control"
+                               id="password"
+                               required />
+                    </div>
+
+                    <button type="submit"
+                            class="btn btn-primary">
+                        Create User
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>

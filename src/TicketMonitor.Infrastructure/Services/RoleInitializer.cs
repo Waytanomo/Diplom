@@ -36,7 +36,7 @@ namespace TicketMonitor.Infrastructure.Services
             {
                 var admin = new ApplicationUser { UserName = "admin", Email = "admin@system.local", EmailConfirmed = true };
                 var res = await userManager.CreateAsync(admin, "Admin123!");
-                if (res.Succeeded) await userManager.AddToRoleAsync(admin, "Administrator");
+                if (res.Succeeded) await userManager.AddToRoleAsync(admin, "Manager");
             }
         }
 

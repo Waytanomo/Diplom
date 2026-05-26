@@ -1,0 +1,31 @@
+﻿@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="text-center mt-5">
+
+    <h1 class="display-4 mb-4">
+        TicketMonitor
+    </h1>
+
+    <p class="lead">
+        Ticket management system built with ASP.NET Core
+    </p>
+
+    <div class="mt-5 d-flex justify-content-center gap-3">
+
+        <a class="btn btn-primary btn-lg"
+               asp-controller="TicketsPage"
+               asp-action="Index">
+            Tickets
+        </a>
+
+        <a class="btn btn-outline-dark btn-lg"
+               asp-controller="DashboardPage"
+               asp-action="Index">
+            Dashboard
+        </a>
+
+    </div>
+
+</div>
