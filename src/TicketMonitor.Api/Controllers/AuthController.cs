@@ -1,12 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 using TicketMonitor.Core.Entities;
 
 namespace TicketMonitor.Api.Controllers
 {
-    // DTO для входа — явные свойства, никаких "магических строк"
     public record LoginRequest(string Username, string Password);
-    public record RegisterRequest(string Username, string Email, string Password, string Role = "Client");
+    public record RegisterRequest(string UserName, string Email, string Password, string Role = "Client");
 
     [ApiController]
     [Route("api/[controller]")]
@@ -14,11 +17,16 @@ namespace TicketMonitor.Api.Controllers
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
+        private readonly IConfiguration _config;
 
-        public AuthController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager)
+        public AuthController(
+            UserManager<ApplicationUser> userManager,
+            SignInManager<ApplicationUser> signInManager,
+            IConfiguration config)
         {
             _userManager = userManager;
             _signInManager = signInManager;
+            _config = config;
         }
 
         [HttpPost("register")]
@@ -26,7 +34,7 @@ namespace TicketMonitor.Api.Controllers
         {
             var user = new ApplicationUser
             {
-                UserName = request.Username,
+                UserName = request.UserName,
                 Email = request.Email,
                 EmailConfirmed = true
             };
@@ -35,22 +43,38 @@ namespace TicketMonitor.Api.Controllers
             if (!result.Succeeded)
                 return BadRequest(result.Errors);
 
-            await _userManager.AddToRoleAsync(user, request.Role);
+            var allowedRoles = new[] { "Administrator", "Manager", "Executor", "Client" };
+            var role = allowedRoles.Contains(request.Role) ? request.Role : "Client";
+            await _userManager.AddToRoleAsync(user, role);
+
             return Ok(new { message = "User created" });
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            var result = await _signInManager.PasswordSignInAsync(
-                request.Username,
-                request.Password,
-                isPersistent: true,
-                lockoutOnFailure: false);
+            var user = await _userManager.FindByNameAsync(request.Username);
+            if (user == null)
+                return Unauthorized(new { message = "Invalid username or password" });
 
-            return result.Succeeded
-                ? Ok(new { message = "Успешный вход" })
-                : Unauthorized(new { message = "Неверные логин или пароль" });
+            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
+            if (!result.Succeeded)
+                return Unauthorized(new { message = "Invalid username or password" });
+
+            var roles = await _userManager.GetRolesAsync(user);
+            var token = GenerateJwt(user, roles);
+
+            return Ok(new
+            {
+                token,
+                user = new
+                {
+                    id = user.Id,
+                    username = user.UserName,
+                    email = user.Email,
+                    roles
+                }
+            });
         }
 
         [HttpPost("logout")]
@@ -58,6 +82,47 @@ namespace TicketMonitor.Api.Controllers
         {
             await _signInManager.SignOutAsync();
             return Ok();
+        }
+
+        [HttpGet("me")]
+        [Microsoft.AspNetCore.Authorization.Authorize]
+        public async Task<IActionResult> Me()
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = await _userManager.FindByIdAsync(userId!);
+            if (user == null) return Unauthorized();
+            var roles = await _userManager.GetRolesAsync(user);
+            return Ok(new { id = user.Id, username = user.UserName, email = user.Email, roles });
+        }
+
+        private string GenerateJwt(ApplicationUser user, IList<string> roles)
+        {
+            var jwtKey = _config["Jwt:Key"] ?? "SuperSecretKeyThatIsAtLeast32CharactersLong!";
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var claims = new List<Claim>
+            {
+                new(ClaimTypes.NameIdentifier, user.Id),
+                new(ClaimTypes.Name, user.UserName ?? ""),
+                new(JwtRegisteredClaimNames.Sub, user.Id),
+                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            };
+
+            foreach (var role in roles)
+                claims.Add(new Claim(ClaimTypes.Role, role));
+
+            var expireHours = int.TryParse(_config["Jwt:ExpireHours"], out var h) ? h : 8;
+
+            var token = new JwtSecurityToken(
+                issuer: _config["Jwt:Issuer"] ?? "TicketMonitor",
+                audience: _config["Jwt:Audience"] ?? "TicketMonitor",
+                claims: claims,
+                expires: DateTime.UtcNow.AddHours(expireHours),
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
     }
 }

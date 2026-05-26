@@ -1,92 +1,179 @@
-﻿@{
+@{
     ViewData["Title"] = "Tickets";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-
-    <h1>
-        Tickets
-    </h1>
-
-    <a class="btn btn-primary"
-           asp-controller="TicketsPage"
-           asp-action="Create">
-        Create Ticket
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Tickets</h1>
+        <p class="page-subtitle" id="ticketCount">Loading…</p>
+    </div>
+    <a class="tm-btn tm-btn-primary" asp-controller="TicketsPage" asp-action="Create" id="createBtn" style="display:none">
+        + New Ticket
     </a>
-
 </div>
 
-<div class="card shadow-sm">
+<div class="filters-bar">
+    <div class="search-input-wrap">
+        <span class="search-icon">⌕</span>
+        <input type="text" class="tm-input" id="searchInput" placeholder="Search tickets…" />
+    </div>
+    <select class="tm-select" id="statusFilter" style="width:auto;min-width:130px">
+        <option value="">All Statuses</option>
+        <option value="Open">Open</option>
+        <option value="InProgress">In Progress</option>
+        <option value="Resolved">Resolved</option>
+        <option value="Closed">Closed</option>
+    </select>
+    <select class="tm-select" id="priorityFilter" style="width:auto;min-width:130px">
+        <option value="">All Priorities</option>
+        <option value="Low">Low</option>
+        <option value="Medium">Medium</option>
+        <option value="High">High</option>
+        <option value="Critical">Critical</option>
+    </select>
+    <select class="tm-select" id="pageSizeSelect" style="width:auto">
+        <option value="10">10 / page</option>
+        <option value="25">25 / page</option>
+        <option value="50">50 / page</option>
+    </select>
+</div>
 
-    <div class="card-body">
-
-        <table class="table table-hover">
-
+<div class="tm-card">
+    <div class="tm-table-wrap">
+        <table class="tm-table">
             <thead>
                 <tr>
+                    <th>#</th>
                     <th>Title</th>
                     <th>Status</th>
                     <th>Priority</th>
+                    <th>Assigned To</th>
                     <th>Created</th>
                 </tr>
             </thead>
-
-            <tbody id="ticketsTableBody">
+            <tbody id="ticketsBody">
+                <tr><td colspan="6"><div class="loading-overlay"><div class="tm-spinner"></div></div></td></tr>
             </tbody>
-
         </table>
-
     </div>
-
+    <div class="tm-pagination" id="pagination" style="display:none">
+        <span id="paginationInfo" style="color:var(--text-muted)"></span>
+        <div class="pagination-pages" id="paginationPages"></div>
+    </div>
 </div>
 
 @section Scripts {
-
 <script>
+document.addEventListener('DOMContentLoaded', () => {
+    requireAuth();
 
-async function loadTickets() {
+    const user = Auth.getUser();
+    const canCreate = Auth.hasAnyRole('Manager', 'Client', 'Administrator');
+    if (canCreate) document.getElementById('createBtn').style.display = '';
 
-    const token = localStorage.getItem('token');
+    let state = { page: 1, pageSize: 10, status: '', priority: '', search: '' };
+    let searchTimer;
 
-    const response = await fetch('/api/tickets', {
-        headers: {
-            'Authorization': `Bearer ${token}`
+    async function load() {
+        const params = new URLSearchParams();
+        params.set('page', state.page);
+        params.set('pageSize', state.pageSize);
+        if (state.status) params.set('status', state.status);
+        if (state.priority) params.set('priority', state.priority);
+        if (state.search) params.set('search', state.search);
+
+        const tbody = document.getElementById('ticketsBody');
+        tbody.innerHTML = '<tr><td colspan="6"><div class="loading-overlay"><div class="tm-spinner"></div></div></td></tr>';
+
+        try {
+            const res = await API.get('/api/tickets?' + params);
+            if (!res.ok) throw new Error('Failed to load');
+            const data = await res.json();
+            renderTickets(data);
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">⚠</div><div class="empty-text">${err.message}</div></div></td></tr>`;
         }
-    });
-
-    if (!response.ok) {
-
-        console.error('Failed to load tickets');
-
-        return;
     }
 
-    const tickets = await response.json();
+    function renderTickets(data) {
+        const tbody = document.getElementById('ticketsBody');
+        const items = data.items || [];
 
-    console.log(tickets);
+        document.getElementById('ticketCount').textContent = `${data.total} ticket${data.total !== 1 ? 's' : ''}`;
 
-    const tableBody =
-        document.getElementById('ticketsTableBody');
+        if (items.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">🎫</div><div class="empty-text">No tickets found</div></div></td></tr>`;
+            document.getElementById('pagination').style.display = 'none';
+            return;
+        }
 
-    tableBody.innerHTML = '';
+        tbody.innerHTML = items.map(t => `
+            <tr onclick="window.location.href='/TicketsPage/Details/${t.id}'">
+                <td><span class="ticket-id">#${t.id}</span></td>
+                <td><span class="ticket-title-cell">${Helpers.escapeHtml(t.title)}</span></td>
+                <td>${Helpers.statusBadge(t.status)}</td>
+                <td>${Helpers.priorityBadge(t.priority)}</td>
+                <td style="color:var(--text-secondary);font-size:0.85rem">${t.assignedToName ? Helpers.escapeHtml(t.assignedToName) : '<span style="color:var(--text-muted)">Unassigned</span>'}</td>
+                <td style="color:var(--text-muted);font-size:0.8rem;font-family:var(--font-mono)">${Helpers.formatDate(t.createdAt)}</td>
+            </tr>
+        `).join('');
 
-    tickets.forEach(ticket => {
+        renderPagination(data);
+    }
 
-        const row = document.createElement('tr');
+    function renderPagination(data) {
+        const pg = document.getElementById('pagination');
+        const info = document.getElementById('paginationInfo');
+        const pages = document.getElementById('paginationPages');
 
-        row.innerHTML = `
-            <td>${ticket.title}</td>
-            <td>${ticket.status}</td>
-            <td>${ticket.priority}</td>
-            <td>${new Date(ticket.createdAt).toLocaleDateString()}</td>
-        `;
+        const start = (data.page - 1) * data.pageSize + 1;
+        const end = Math.min(data.page * data.pageSize, data.total);
+        info.textContent = `${start}–${end} of ${data.total}`;
 
-        tableBody.appendChild(row);
+        const totalPages = data.totalPages;
+        if (totalPages <= 1) { pg.style.display = 'none'; return; }
+        pg.style.display = '';
+
+        let html = `<button class="page-btn" ${data.page <= 1 ? 'disabled' : ''} onclick="goPage(${data.page - 1})">‹</button>`;
+
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || Math.abs(i - data.page) <= 1) {
+                html += `<button class="page-btn${i === data.page ? ' active' : ''}" onclick="goPage(${i})">${i}</button>`;
+            } else if (Math.abs(i - data.page) === 2) {
+                html += `<span style="color:var(--text-muted);padding:0 4px">…</span>`;
+            }
+        }
+
+        html += `<button class="page-btn" ${data.page >= totalPages ? 'disabled' : ''} onclick="goPage(${data.page + 1})">›</button>`;
+        pages.innerHTML = html;
+    }
+
+    window.goPage = (p) => { state.page = p; load(); };
+
+    document.getElementById('statusFilter').addEventListener('change', e => {
+        state.status = e.target.value; state.page = 1; load();
     });
-}
+    document.getElementById('priorityFilter').addEventListener('change', e => {
+        state.priority = e.target.value; state.page = 1; load();
+    });
+    document.getElementById('pageSizeSelect').addEventListener('change', e => {
+        state.pageSize = parseInt(e.target.value); state.page = 1; load();
+    });
+    document.getElementById('searchInput').addEventListener('input', e => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            state.search = e.target.value.trim();
+            state.page = 1;
+            load();
+        }, 300);
+    });
 
-loadTickets();
+    // Real-time updates
+    document.addEventListener('tm:ticketCreated', () => load());
+    document.addEventListener('tm:ticketUpdated', () => load());
+    document.addEventListener('tm:ticketDeleted', () => load());
 
+    load();
+});
 </script>
-
 }

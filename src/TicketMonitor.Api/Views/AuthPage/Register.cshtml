@@ -1,133 +1,87 @@
-﻿@{
+@{
     ViewData["Title"] = "Register";
 }
 
-<div class="row justify-content-center">
+<div class="auth-wrap">
+    <div class="auth-card">
+        <h1 class="auth-title">Create account</h1>
+        <p class="auth-subtitle">Join TicketMonitor to manage support tickets</p>
 
-    <div class="col-md-5">
+        <div id="errorMsg" class="tm-alert tm-alert-danger"></div>
+        <div id="successMsg" class="tm-alert tm-alert-success"></div>
 
-        <div class="card shadow-sm">
-
-            <div class="card-body p-4">
-
-                <h2 class="text-center mb-4">
-                    Register
-                </h2>
-
-                <div id="errorMessage"
-                     class="alert alert-danger d-none">
-                </div>
-
-                <form id="registerForm">
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            Username
-                        </label>
-
-                        <input type="text"
-                               class="form-control"
-                               id="username"
-                               required />
-
-                    </div>
-
-                    <div class="mb-3">
-
-                        <label class="form-label">
-                            Email
-                        </label>
-
-                        <input type="email"
-                               class="form-control"
-                               id="email"
-                               required />
-
-                    </div>
-
-                    <div class="mb-4">
-
-                        <label class="form-label">
-                            Password
-                        </label>
-
-                        <input type="password"
-                               class="form-control"
-                               id="password"
-                               required />
-
-                    </div>
-
-                    <button type="submit"
-                            class="btn btn-success w-100">
-
-                        Register
-
-                    </button>
-
-                </form>
-
-            </div>
-
+        <div class="tm-form-group">
+            <label class="tm-label" for="username">Username</label>
+            <input type="text" class="tm-input" id="username" placeholder="Choose a username" autocomplete="username" />
         </div>
 
-    </div>
+        <div class="tm-form-group">
+            <label class="tm-label" for="email">Email</label>
+            <input type="email" class="tm-input" id="email" placeholder="you@example.com" autocomplete="email" />
+        </div>
 
+        <div class="tm-form-group">
+            <label class="tm-label" for="password">Password</label>
+            <input type="password" class="tm-input" id="password" placeholder="At least 6 characters" autocomplete="new-password" />
+        </div>
+
+        <button class="tm-btn tm-btn-primary" id="registerBtn" style="width:100%;justify-content:center;margin-top:4px">
+            Create Account
+        </button>
+
+        <div class="auth-footer">
+            Already have an account? <a asp-controller="AuthPage" asp-action="Login">Sign in</a>
+        </div>
+    </div>
 </div>
 
 @section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('registerBtn');
+    const errorMsg = document.getElementById('errorMsg');
+    const successMsg = document.getElementById('successMsg');
 
-    <script>
+    btn.addEventListener('click', async () => {
+        errorMsg.classList.remove('show');
+        successMsg.classList.remove('show');
 
-        document
-            .getElementById('registerForm')
-            .addEventListener('submit', async function (e) {
+        const username = document.getElementById('username').value.trim();
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
 
-                e.preventDefault();
+        if (!username || !email || !password) {
+            errorMsg.textContent = 'All fields are required';
+            errorMsg.classList.add('show');
+            return;
+        }
 
-                const errorBox =
-                    document.getElementById('errorMessage');
+        btn.disabled = true;
+        btn.textContent = 'Creating account…';
 
-                errorBox.classList.add('d-none');
-
-                const username =
-                    document.getElementById('username').value;
-
-                const email =
-                    document.getElementById('email').value;
-
-                const password =
-                    document.getElementById('password').value;
-
-                const response = await fetch('/api/auth/register', {
-
-                    method: 'POST',
-
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-
-                    body: JSON.stringify({
-                        userName: username,
-                        email,
-                        password
-                    })
-                });
-
-                if (!response.ok) {
-
-                    errorBox.innerText =
-                        'Registration failed';
-
-                    errorBox.classList.remove('d-none');
-
-                    return;
-                }
-
-                window.location.href = '/AuthPage/Login';
+        try {
+            const res = await fetch('/api/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userName: username, email, password, role: 'Client' })
             });
 
-    </script>
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                const errs = data.errors ? data.errors.map(e => e.description || e).join(', ') : (data.message || 'Registration failed');
+                throw new Error(errs);
+            }
 
+            successMsg.textContent = 'Account created! Redirecting to login…';
+            successMsg.classList.add('show');
+            setTimeout(() => window.location.href = '/AuthPage/Login', 1500);
+        } catch (err) {
+            errorMsg.textContent = err.message;
+            errorMsg.classList.add('show');
+            btn.disabled = false;
+            btn.textContent = 'Create Account';
+        }
+    });
+});
+</script>
 }

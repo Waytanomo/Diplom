@@ -1,31 +1,59 @@
-﻿@{
+@{
     ViewData["Title"] = "Home";
 }
 
-<div class="text-center mt-5">
-
-    <h1 class="display-4 mb-4">
+<div style="max-width:680px;margin:60px auto;text-align:center">
+    <div style="font-size:3.5rem;margin-bottom:24px">🎫</div>
+    <h1 style="font-size:2.5rem;font-weight:700;letter-spacing:-0.03em;margin-bottom:16px">
         TicketMonitor
     </h1>
-
-    <p class="lead">
-        Ticket management system built with ASP.NET Core
+    <p style="font-size:1.1rem;color:var(--text-secondary);margin-bottom:40px;line-height:1.7">
+        Streamlined ticket management for your team.<br/>
+        Track issues, assign work, and resolve faster.
     </p>
-
-    <div class="mt-5 d-flex justify-content-center gap-3">
-
-        <a class="btn btn-primary btn-lg"
-               asp-controller="TicketsPage"
-               asp-action="Index">
-            Tickets
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <a asp-controller="TicketsPage" asp-action="Index" class="tm-btn tm-btn-primary" style="padding:12px 28px">
+            View Tickets
         </a>
-
-        <a class="btn btn-outline-dark btn-lg"
-               asp-controller="DashboardPage"
-               asp-action="Index">
-            Dashboard
+        <a asp-controller="AuthPage" asp-action="Login" class="tm-btn tm-btn-secondary" style="padding:12px 28px" id="homeLoginBtn">
+            Sign In
         </a>
-
     </div>
 
+    <div id="homeStats" style="display:none;margin-top:60px">
+        <div class="stat-grid" style="max-width:500px;margin:0 auto">
+            <div class="stat-card accent">
+                <div class="stat-label">Open Tickets</div>
+                <div class="stat-value" id="homeOpen">—</div>
+            </div>
+            <div class="stat-card blue">
+                <div class="stat-label">In Progress</div>
+                <div class="stat-value" id="homeInProgress">—</div>
+            </div>
+        </div>
+    </div>
 </div>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    if (Auth.isLoggedIn()) {
+        document.getElementById('homeLoginBtn').style.display = 'none';
+        if (Auth.hasAnyRole('Administrator', 'Manager')) {
+            loadHomeStats();
+        }
+    }
+
+    async function loadHomeStats() {
+        try {
+            const res = await API.get('/api/tickets/stats');
+            if (!res.ok) return;
+            const stats = await res.json();
+            document.getElementById('homeStats').style.display = '';
+            document.getElementById('homeOpen').textContent = stats.byStatus?.Open || 0;
+            document.getElementById('homeInProgress').textContent = stats.byStatus?.InProgress || 0;
+        } catch {}
+    }
+});
+</script>
+}

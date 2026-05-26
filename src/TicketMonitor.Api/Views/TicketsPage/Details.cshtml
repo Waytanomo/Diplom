@@ -1,0 +1,312 @@
+@{
+    ViewData["Title"] = "Ticket Details";
+}
+
+<div id="loadingWrap" class="loading-overlay"><div class="tm-spinner"></div></div>
+<div id="content" style="display:none">
+
+    <div class="page-header">
+        <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+                <a asp-controller="TicketsPage" asp-action="Index" class="tm-btn tm-btn-ghost tm-btn-sm" style="padding:4px 10px">← Back</a>
+                <span class="ticket-id" id="ticketId"></span>
+            </div>
+            <h1 class="page-title" id="ticketTitle" style="font-size:1.5rem"></h1>
+            <div class="detail-meta-row" id="metaBadges"></div>
+        </div>
+        <div style="display:flex;gap:8px" id="actionBtns"></div>
+    </div>
+
+    <div class="ticket-detail-grid">
+        <!-- Main column -->
+        <div>
+            <div class="tm-card" style="margin-bottom:24px">
+                <div class="tm-card-header">
+                    <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted)">Description</span>
+                </div>
+                <div class="tm-card-body">
+                    <div class="ticket-body" id="ticketDesc"></div>
+                </div>
+            </div>
+
+            <!-- Comments -->
+            <div class="tm-card" id="commentsCard">
+                <div class="tm-card-header">
+                    <div class="comments-title">
+                        Comments <span class="comment-count" id="commentCount">0</span>
+                    </div>
+                </div>
+                <div class="tm-card-body">
+                    <div id="commentList" class="comment-list"></div>
+                    <div id="noComments" class="empty-state" style="padding:32px;display:none">
+                        <div class="empty-icon">💬</div>
+                        <div class="empty-text">No comments yet</div>
+                    </div>
+                    <div class="comment-form" id="commentForm" style="margin-top:20px">
+                        <textarea class="tm-textarea" id="commentText" placeholder="Write a comment…" rows="3" style="min-height:80px"></textarea>
+                        <div style="display:flex;justify-content:flex-end">
+                            <button class="tm-btn tm-btn-primary tm-btn-sm" id="submitComment">Post Comment</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Details</div>
+                <div id="ticketMeta"></div>
+            </div>
+
+            <!-- Status change (Manager/Executor/Admin) -->
+            <div class="sidebar-section" id="statusSection" style="display:none">
+                <div class="sidebar-section-title">Change Status</div>
+                <select class="tm-select" id="newStatus" style="margin-bottom:10px">
+                    <option value="0">Open</option>
+                    <option value="1">In Progress</option>
+                    <option value="2">Resolved</option>
+                    <option value="3">Closed</option>
+                </select>
+                <button class="tm-btn tm-btn-secondary tm-btn-sm" id="changeStatusBtn" style="width:100%;justify-content:center">
+                    Update Status
+                </button>
+            </div>
+
+            <!-- Assign (Manager/Admin) -->
+            <div class="sidebar-section" id="assignSection" style="display:none">
+                <div class="sidebar-section-title">Assign Ticket</div>
+                <select class="tm-select" id="assigneeSelect" style="margin-bottom:10px">
+                    <option value="">Unassigned</option>
+                </select>
+                <button class="tm-btn tm-btn-secondary tm-btn-sm" id="assignBtn" style="width:100%;justify-content:center">
+                    Assign
+                </button>
+            </div>
+
+            <!-- Status log -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">Status History</div>
+                <div id="statusLog" class="status-log">
+                    <div style="color:var(--text-muted);font-size:0.8rem">No history yet</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete modal -->
+<div id="deleteModal" class="tm-modal-backdrop" style="display:none">
+    <div class="tm-modal">
+        <div class="modal-title">Delete Ticket?</div>
+        <p style="color:var(--text-secondary);font-size:0.9rem">This action cannot be undone. The ticket will be soft-deleted.</p>
+        <div class="modal-footer">
+            <button class="tm-btn tm-btn-secondary" onclick="document.getElementById('deleteModal').style.display='none'">Cancel</button>
+            <button class="tm-btn tm-btn-danger" id="confirmDelete">Delete</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    requireAuth();
+
+    const ticketId = parseInt(location.pathname.split('/').pop());
+    if (!ticketId) return;
+
+    const user = Auth.getUser();
+    const canManage = Auth.hasAnyRole('Manager', 'Administrator');
+    const canStatus = Auth.hasAnyRole('Manager', 'Executor', 'Administrator');
+
+    let currentTicket = null;
+
+    async function loadTicket() {
+        try {
+            const res = await API.get(`/api/tickets/${ticketId}`);
+            if (res.status === 404) {
+                document.getElementById('loadingWrap').innerHTML = '<div class="empty-state"><div class="empty-icon">404</div><div class="empty-text">Ticket not found</div></div>';
+                return;
+            }
+            currentTicket = await res.json();
+            renderTicket(currentTicket);
+        } catch (err) {
+            Notifications.error('Failed to load ticket');
+        }
+    }
+
+    async function loadComments() {
+        try {
+            const res = await API.get(`/api/tickets/${ticketId}/comments`);
+            const comments = await res.json();
+            renderComments(comments);
+        } catch {}
+    }
+
+    async function loadUsers() {
+        if (!canManage) return;
+        try {
+            const res = await API.get('/api/users');
+            if (!res.ok) return;
+            const users = await res.json();
+            const sel = document.getElementById('assigneeSelect');
+            sel.innerHTML = '<option value="">Unassigned</option>' +
+                users.map(u => `<option value="${u.id}">${Helpers.escapeHtml(u.userName)}</option>`).join('');
+            if (currentTicket?.assignedToId) sel.value = currentTicket.assignedToId;
+        } catch {}
+    }
+
+    function renderTicket(t) {
+        document.getElementById('loadingWrap').style.display = 'none';
+        document.getElementById('content').style.display = '';
+        document.getElementById('ticketId').textContent = `#${t.id}`;
+        document.getElementById('ticketTitle').textContent = t.title;
+        document.getElementById('ticketDesc').textContent = t.description;
+
+        const metaBadges = document.getElementById('metaBadges');
+        metaBadges.innerHTML = Helpers.statusBadge(t.status) + ' ' + Helpers.priorityBadge(t.priority);
+
+        const statusNames = ['Open','InProgress','Resolved','Closed'];
+        document.getElementById('ticketMeta').innerHTML = `
+            <div class="meta-row"><span class="meta-key">Created by</span><span class="meta-val">${Helpers.escapeHtml(t.createdByName)}</span></div>
+            <div class="meta-row"><span class="meta-key">Assigned to</span><span class="meta-val">${t.assignedToName ? Helpers.escapeHtml(t.assignedToName) : '<span style="color:var(--text-muted)">Unassigned</span>'}</span></div>
+            <div class="meta-row"><span class="meta-key">Created</span><span class="meta-val">${Helpers.formatDateTime(t.createdAt)}</span></div>
+            ${t.closedAt ? `<div class="meta-row"><span class="meta-key">Closed</span><span class="meta-val">${Helpers.formatDateTime(t.closedAt)}</span></div>` : ''}
+        `;
+
+        // Action buttons
+        const actionBtns = document.getElementById('actionBtns');
+        if (canManage) {
+            actionBtns.innerHTML = `<button class="tm-btn tm-btn-danger tm-btn-sm" id="deleteBtn">🗑 Delete</button>`;
+            document.getElementById('deleteBtn').addEventListener('click', () => {
+                document.getElementById('deleteModal').style.display = 'flex';
+            });
+        }
+
+        // Sections visibility
+        if (canStatus) {
+            document.getElementById('statusSection').style.display = '';
+            const statusMap = { 'Open': 0, 'InProgress': 1, 'Resolved': 2, 'Closed': 3 };
+            document.getElementById('newStatus').value = statusMap[t.status] ?? 0;
+        }
+        if (canManage) {
+            document.getElementById('assignSection').style.display = '';
+            loadUsers();
+        }
+    }
+
+    function renderComments(comments) {
+        const list = document.getElementById('commentList');
+        const noComments = document.getElementById('noComments');
+        document.getElementById('commentCount').textContent = comments.length;
+
+        if (comments.length === 0) {
+            list.innerHTML = '';
+            noComments.style.display = '';
+            return;
+        }
+
+        noComments.style.display = 'none';
+        list.innerHTML = comments.map(c => `
+            <div class="comment-item">
+                <div class="comment-header">
+                    <div class="comment-avatar">${Helpers.escapeHtml(c.authorName[0]?.toUpperCase() || '?')}</div>
+                    <span class="comment-author">${Helpers.escapeHtml(c.authorName)}</span>
+                    <span class="comment-time">${Helpers.timeAgo(c.createdAt)}</span>
+                </div>
+                <div class="comment-text">${Helpers.escapeHtml(c.text)}</div>
+            </div>
+        `).join('');
+    }
+
+    // Change status
+    document.getElementById('changeStatusBtn')?.addEventListener('click', async () => {
+        const newStatus = parseInt(document.getElementById('newStatus').value);
+        const btn = document.getElementById('changeStatusBtn');
+        btn.disabled = true; btn.textContent = 'Updating…';
+        try {
+            const res = await API.put(`/api/tickets/${ticketId}/status`, { newStatus });
+            if (!res.ok) throw new Error('Failed');
+            Notifications.success('Status updated');
+            await loadTicket();
+        } catch {
+            Notifications.error('Failed to update status');
+        } finally {
+            btn.disabled = false; btn.textContent = 'Update Status';
+        }
+    });
+
+    // Assign
+    document.getElementById('assignBtn')?.addEventListener('click', async () => {
+        const assigneeId = document.getElementById('assigneeSelect').value;
+        const btn = document.getElementById('assignBtn');
+        btn.disabled = true; btn.textContent = 'Assigning…';
+        try {
+            const res = await API.put(`/api/tickets/${ticketId}/assign`, { assigneeId: assigneeId || null });
+            if (!res.ok) throw new Error('Failed');
+            Notifications.success('Ticket assigned');
+            await loadTicket();
+        } catch {
+            Notifications.error('Failed to assign ticket');
+        } finally {
+            btn.disabled = false; btn.textContent = 'Assign';
+        }
+    });
+
+    // Add comment
+    document.getElementById('submitComment')?.addEventListener('click', async () => {
+        const text = document.getElementById('commentText').value.trim();
+        if (!text) return;
+        const btn = document.getElementById('submitComment');
+        btn.disabled = true; btn.textContent = 'Posting…';
+        try {
+            const res = await API.post(`/api/tickets/${ticketId}/comments`, { text });
+            if (!res.ok) throw new Error('Failed');
+            document.getElementById('commentText').value = '';
+            await loadComments();
+            Notifications.success('Comment added');
+        } catch {
+            Notifications.error('Failed to post comment');
+        } finally {
+            btn.disabled = false; btn.textContent = 'Post Comment';
+        }
+    });
+
+    // Ctrl+Enter to submit comment
+    document.getElementById('commentText')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey))
+            document.getElementById('submitComment').click();
+    });
+
+    // Delete
+    document.getElementById('confirmDelete')?.addEventListener('click', async () => {
+        try {
+            const res = await API.delete(`/api/tickets/${ticketId}`);
+            if (!res.ok) throw new Error('Failed');
+            Notifications.success('Ticket deleted');
+            setTimeout(() => window.location.href = '/TicketsPage', 1000);
+        } catch {
+            Notifications.error('Failed to delete ticket');
+        }
+        document.getElementById('deleteModal').style.display = 'none';
+    });
+
+    // SignalR: join ticket room
+    await loadTicket();
+    await loadComments();
+
+    document.addEventListener('tm:statusChanged', e => {
+        if (e.detail.ticketId == ticketId) loadTicket();
+    });
+    document.addEventListener('tm:commentAdded', e => {
+        loadComments();
+    });
+    document.addEventListener('tm:ticketAssigned', e => {
+        if (e.detail.ticketId == ticketId) loadTicket();
+    });
+
+    // Join SignalR group after connection is ready
+    setTimeout(() => TM_SignalR.joinTicket(ticketId), 1000);
+});
+</script>
+}
