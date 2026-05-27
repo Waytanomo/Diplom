@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using TicketMonitor.Api.Hubs;
 using TicketMonitor.Api.Middleware;
+using TicketMonitor.Api.Services;
 using TicketMonitor.Api.Validators;
 using TicketMonitor.Core.Entities;
 using TicketMonitor.Core.Interfaces;
@@ -76,6 +77,7 @@ namespace TicketMonitor.Api
             builder.Services.AddSignalR();
             builder.Services.AddScoped<ITicketService, TicketService>();
             builder.Services.AddHostedService<RoleInitializer>();
+            builder.Services.AddScoped<ITicketNotificationService, SignalRTicketNotificationService>();
 
             builder.Services.AddControllersWithViews()
                 .AddJsonOptions(opt =>

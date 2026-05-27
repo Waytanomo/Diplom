@@ -8,4 +8,9 @@ public class AdminPageController : Controller
     {
         return View();
     }
+
+    public IActionResult Users()
+    {
+        return View();
+    }
 }

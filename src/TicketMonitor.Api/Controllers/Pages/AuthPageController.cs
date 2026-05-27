@@ -9,4 +9,10 @@ public class AuthPageController : Controller
     {
         return View();
     }
+
+    [HttpGet]
+    public IActionResult Register()
+    {
+        return View();
+    }
 }
