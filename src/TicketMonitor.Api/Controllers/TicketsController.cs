@@ -19,6 +19,11 @@ namespace TicketMonitor.Api.Controllers
             User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new UnauthorizedAccessException();
 
+        private IEnumerable<string> UserRoles =>
+            User.Claims
+                .Where(c => c.Type == ClaimTypes.Role)
+                .Select(c => c.Value);
+
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] int page = 1,
@@ -27,7 +32,11 @@ namespace TicketMonitor.Api.Controllers
             [FromQuery] string? priority = null,
             [FromQuery] string? search = null)
         {
-            return Ok(await _svc.GetAllAsync(page, pageSize, status, priority, search));
+            // Передаём userId и роли — сервис сам решает что показывать
+            return Ok(await _svc.GetAllAsync(
+                UserId, UserRoles,
+                page, pageSize,
+                status, priority, search));
         }
 
         [HttpGet("{id}")]
@@ -51,8 +60,9 @@ namespace TicketMonitor.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = res.Id }, res);
         }
 
+        // Executor УДАЛЁН — только Manager и Administrator
         [HttpPut("{id}/status")]
-        [Authorize(Roles = "Manager,Executor,Administrator")]
+        [Authorize(Roles = "Manager,Administrator")]
         public async Task<IActionResult> ChangeStatus(int id, [FromBody] ChangeStatusDto dto)
         {
             return await _svc.ChangeStatusAsync(id, dto, UserId) ? Ok() : NotFound();

@@ -17,26 +17,48 @@ namespace TicketMonitor.Infrastructure.Services
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            // Создаём изолированный Scope для доступа к Scoped-сервисам из Singleton
             using var scope = _scopeFactory.CreateScope();
             var serviceProvider = scope.ServiceProvider;
 
             var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
-            // Создаём роли
-            foreach (var role in new[] { "Administrator", "Manager", "Executor", "Client" })
+            // Роль Executor УДАЛЕНА. Текущие роли: Administrator, Manager, Client
+            var validRoles = new[] { "Administrator", "Manager", "Client" };
+
+            foreach (var role in validRoles)
             {
                 if (!await roleManager.RoleExistsAsync(role))
                     await roleManager.CreateAsync(new IdentityRole(role));
             }
 
-            // Создаём админа, если его нет
-            if (!await userManager.Users.AnyAsync(u => u.UserName == "admin"))
+            // Удаляем роль Executor из БД если она ещё есть
+            var executorRole = await roleManager.FindByNameAsync("Executor");
+            if (executorRole != null)
             {
-                var admin = new ApplicationUser { UserName = "admin", Email = "admin@system.local", EmailConfirmed = true };
+                // Переназначаем всех Executor → Client
+                var usersInExecutor = await userManager.GetUsersInRoleAsync("Executor");
+                foreach (var u in usersInExecutor)
+                {
+                    await userManager.RemoveFromRoleAsync(u, "Executor");
+                    if (!(await userManager.GetRolesAsync(u)).Any())
+                        await userManager.AddToRoleAsync(u, "Client");
+                }
+                await roleManager.DeleteAsync(executorRole);
+            }
+
+            // Создаём дефолтного админа
+            if (!await userManager.Users.AnyAsync(u => u.UserName == "admin", cancellationToken))
+            {
+                var admin = new ApplicationUser
+                {
+                    UserName = "admin",
+                    Email = "admin@local.tier",
+                    EmailConfirmed = true
+                };
                 var res = await userManager.CreateAsync(admin, "Admin123!");
-                if (res.Succeeded) await userManager.AddToRoleAsync(admin, "Manager");
+                if (res.Succeeded)
+                    await userManager.AddToRoleAsync(admin, "Administrator");
             }
         }
 

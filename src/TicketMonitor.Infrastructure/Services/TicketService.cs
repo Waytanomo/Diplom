@@ -14,6 +14,9 @@ namespace TicketMonitor.Infrastructure.Services
         private readonly ITicketNotificationService _notificationService;
         private readonly UserManager<ApplicationUser> _userManager;
 
+        // Роли с полным доступом ко всем тикетам
+        private static readonly string[] FullAccessRoles = { "Administrator", "Manager" };
+
         public TicketService(
             ApplicationDbContext context,
             ITicketNotificationService notificationService,
@@ -25,6 +28,8 @@ namespace TicketMonitor.Infrastructure.Services
         }
 
         public async Task<PagedResult<TicketDto>> GetAllAsync(
+            string callerUserId,
+            IEnumerable<string> callerRoles,
             int page = 1,
             int pageSize = 10,
             string? status = null,
@@ -39,30 +44,29 @@ namespace TicketMonitor.Infrastructure.Services
                 .Include(t => t.AssignedTo)
                 .AsQueryable();
 
-            if (!string.IsNullOrWhiteSpace(status)
-                && Enum.TryParse<TicketStatus>(
-                    status,
-                    true,
-                    out var statusEnum))
+            // Клиенты видят только созданные ими тикеты + назначенные им
+            // Менеджеры/Администраторы видят все тикеты
+            bool hasFullAccess = callerRoles.Any(r => FullAccessRoles.Contains(r));
+            if (!hasFullAccess)
             {
-                query = query.Where(t => t.Status == statusEnum);
+                // Client: видит тикеты, которые он создал ИЛИ которые ему назначены
+                query = query.Where(t =>
+                    t.CreatedById == callerUserId ||
+                    t.AssignedToId == callerUserId);
             }
 
-            if (!string.IsNullOrWhiteSpace(priority)
-                && Enum.TryParse<TicketPriority>(
-                    priority,
-                    true,
-                    out var priorityEnum))
-            {
+            if (!string.IsNullOrWhiteSpace(status) &&
+                Enum.TryParse<TicketStatus>(status, true, out var statusEnum))
+                query = query.Where(t => t.Status == statusEnum);
+
+            if (!string.IsNullOrWhiteSpace(priority) &&
+                Enum.TryParse<TicketPriority>(priority, true, out var priorityEnum))
                 query = query.Where(t => t.Priority == priorityEnum);
-            }
 
             if (!string.IsNullOrWhiteSpace(search))
-            {
                 query = query.Where(t =>
-                    t.Title.Contains(search)
-                    || t.Description.Contains(search));
-            }
+                    t.Title.Contains(search) ||
+                    t.Description.Contains(search));
 
             var total = await query.CountAsync();
 
@@ -77,7 +81,9 @@ namespace TicketMonitor.Infrastructure.Services
                 Items = tickets.Select(MapToDto),
                 Total = total,
                 Page = page,
-                PageSize = pageSize
+                PageSize = pageSize,
+                // Флаг для фронтенда: показывать ли пояснение об ограниченном доступе
+                IsFiltered = !hasFullAccess
             };
         }
 
@@ -88,9 +94,7 @@ namespace TicketMonitor.Infrastructure.Services
                 .Include(t => t.AssignedTo)
                 .FirstOrDefaultAsync(t => t.Id == id);
 
-            return ticket == null
-                ? null
-                : MapToDto(ticket);
+            return ticket == null ? null : MapToDto(ticket);
         }
 
         public async Task<IEnumerable<CommentDto>> GetCommentsAsync(int id)
@@ -108,9 +112,7 @@ namespace TicketMonitor.Infrastructure.Services
                 .ToListAsync();
         }
 
-        public async Task<TicketDto> CreateAsync(
-            CreateTicketDto dto,
-            string userId)
+        public async Task<TicketDto> CreateAsync(CreateTicketDto dto, string userId)
         {
             var ticket = new Ticket
             {
@@ -121,42 +123,28 @@ namespace TicketMonitor.Infrastructure.Services
             };
 
             _context.Tickets.Add(ticket);
-
             await _context.SaveChangesAsync();
 
-            var createdTicket = await _context.Tickets
+            var created = await _context.Tickets
                 .Include(t => t.CreatedBy)
                 .Include(t => t.AssignedTo)
                 .FirstAsync(t => t.Id == ticket.Id);
 
-            var result = MapToDto(createdTicket);
-
+            var result = MapToDto(created);
             await _notificationService
                 .TicketCreated(result);
-
             return result;
         }
 
-        public async Task<bool> ChangeStatusAsync(
-            int id,
-            ChangeStatusDto dto,
-            string userId)
+        public async Task<bool> ChangeStatusAsync(int id, ChangeStatusDto dto, string userId)
         {
-            var ticket = await _context.Tickets
-                .FirstOrDefaultAsync(t => t.Id == id);
-
-            if (ticket == null)
-            {
-                return false;
-            }
+            var ticket = await _context.Tickets.FindAsync(id);
+            if (ticket == null) return false;
 
             var oldStatus = ticket.Status;
-
             ticket.Status = dto.NewStatus;
-
             ticket.ClosedAt =
-                dto.NewStatus == TicketStatus.Closed
-                || dto.NewStatus == TicketStatus.Resolved
+                dto.NewStatus is TicketStatus.Closed or TicketStatus.Resolved
                     ? DateTime.UtcNow
                     : null;
 
@@ -181,29 +169,18 @@ namespace TicketMonitor.Infrastructure.Services
             return true;
         }
 
-        public async Task<bool> AssignAsync(
-            int id,
-            AssignTicketDto dto,
-            string userId)
+        public async Task<bool> AssignAsync(int id, AssignTicketDto dto, string userId)
         {
-            var ticket = await _context.Tickets
-                .FirstOrDefaultAsync(t => t.Id == id);
+            var ticket = await _context.Tickets.FindAsync(id);
+            if (ticket == null) return false;
 
-            if (ticket == null)
+            if (!string.IsNullOrEmpty(dto.AssigneeId))
             {
-                return false;
+                bool userExists = await _context.Users.AnyAsync(u => u.Id == dto.AssigneeId);
+                if (!userExists) return false;
             }
 
-            bool userExists = await _context.Users
-                .AnyAsync(u => u.Id == dto.AssigneeId);
-
-            if (!userExists)
-            {
-                return false;
-            }
-
-            ticket.AssignedToId = dto.AssigneeId;
-
+            ticket.AssignedToId = string.IsNullOrEmpty(dto.AssigneeId) ? null : dto.AssigneeId;
             await _context.SaveChangesAsync();
 
             await _notificationService.TicketAssigned(
@@ -216,19 +193,10 @@ namespace TicketMonitor.Infrastructure.Services
             return true;
         }
 
-        public async Task<CommentDto> AddCommentAsync(
-            int id,
-            AddCommentDto dto,
-            string userId)
+        public async Task<CommentDto> AddCommentAsync(int id, AddCommentDto dto, string userId)
         {
-            bool ticketExists = await _context.Tickets
-                .AnyAsync(t => t.Id == id);
-
-            if (!ticketExists)
-            {
-                throw new KeyNotFoundException(
-                    "Ticket not found");
-            }
+            if (!await _context.Tickets.AnyAsync(t => t.Id == id))
+                throw new KeyNotFoundException("Ticket not found");
 
             var comment = new Comment
             {
@@ -238,140 +206,85 @@ namespace TicketMonitor.Infrastructure.Services
             };
 
             _context.Comments.Add(comment);
-
             await _context.SaveChangesAsync();
 
-            var savedComment = await _context.Comments
+            var saved = await _context.Comments
                 .Include(c => c.Author)
                 .FirstAsync(c => c.Id == comment.Id);
 
             var result = new CommentDto(
-                savedComment.Id,
-                savedComment.Text,
-                savedComment.Author.UserName ?? "Unknown",
-                savedComment.AuthorId,
-                savedComment.CreatedAt);
+                saved.Id, saved.Text,
+                saved.Author.UserName ?? "Unknown",
+                saved.AuthorId, saved.CreatedAt);
 
             await _notificationService.CommentAdded(
                 id,
                 result);
-
             return result;
         }
 
         public async Task<TicketStatsDto> GetStatsAsync()
         {
-            var total = await _context.Tickets
-                .CountAsync();
+            var total = await _context.Tickets.CountAsync();
 
             var byStatus = await _context.Tickets
                 .GroupBy(t => t.Status)
-                .Select(g => new
-                {
-                    Status = g.Key.ToString(),
-                    Count = g.Count()
-                })
-                .ToDictionaryAsync(
-                    x => x.Status,
-                    x => x.Count);
+                .Select(g => new { Status = g.Key.ToString(), Count = g.Count() })
+                .ToDictionaryAsync(x => x.Status, x => x.Count);
 
             var byPriority = await _context.Tickets
                 .GroupBy(t => t.Priority)
-                .Select(g => new
-                {
-                    Priority = g.Key.ToString(),
-                    Count = g.Count()
-                })
-                .ToDictionaryAsync(
-                    x => x.Priority,
-                    x => x.Count);
+                .Select(g => new { Priority = g.Key.ToString(), Count = g.Count() })
+                .ToDictionaryAsync(x => x.Priority, x => x.Count);
 
             var byAssignee = await _context.Tickets
                 .Where(t => t.AssignedTo != null)
                 .GroupBy(t => t.AssignedTo!.UserName)
-                .Select(g => new
-                {
-                    Assignee = g.Key!,
-                    Count = g.Count()
-                })
-                .ToDictionaryAsync(
-                    x => x.Assignee,
-                    x => x.Count);
+                .Select(g => new { Assignee = g.Key!, Count = g.Count() })
+                .ToDictionaryAsync(x => x.Assignee, x => x.Count);
 
             var closed = await _context.Tickets
                 .Where(t => t.ClosedAt.HasValue)
                 .ToListAsync();
 
             var avgHours = closed.Any()
-                ? closed.Average(t =>
-                    (t.ClosedAt!.Value - t.CreatedAt)
-                    .TotalHours)
+                ? closed.Average(t => (t.ClosedAt!.Value - t.CreatedAt).TotalHours)
                 : 0.0;
 
-            return new TicketStatsDto(
-                total,
-                byStatus,
-                byPriority,
-                byAssignee,
-                Math.Round(avgHours, 2));
+            return new TicketStatsDto(total, byStatus, byPriority, byAssignee, Math.Round(avgHours, 2));
         }
 
-        public async Task<bool> DeleteAsync(
-            int id,
-            string userId)
+        public async Task<bool> DeleteAsync(int id, string userId)
         {
-            var ticket = await _context.Tickets
-                .FirstOrDefaultAsync(t => t.Id == id);
-
-            if (ticket == null)
-            {
-                return false;
-            }
+            var ticket = await _context.Tickets.FirstOrDefaultAsync(t => t.Id == id);
+            if (ticket == null) return false;
 
             ticket.IsDeleted = true;
             ticket.DeletedAt = DateTime.UtcNow;
-
             await _context.SaveChangesAsync();
 
             await _notificationService
                 .TicketDeleted(id);
-
             return true;
         }
 
         public async Task<IEnumerable<UserDto>> GetUsersAsync()
         {
-            var users = await _userManager.Users
-                .ToListAsync();
-
+            var users = await _userManager.Users.ToListAsync();
             var result = new List<UserDto>();
-
             foreach (var u in users)
             {
-                var roles = await _userManager
-                    .GetRolesAsync(u);
-
-                result.Add(new UserDto(
-                    u.Id,
-                    u.UserName ?? "",
-                    u.Email ?? "",
-                    roles));
+                var roles = await _userManager.GetRolesAsync(u);
+                result.Add(new UserDto(u.Id, u.UserName ?? "", u.Email ?? "", roles));
             }
-
             return result;
         }
 
         private static TicketDto MapToDto(Ticket t) => new(
-            t.Id,
-            t.Title,
-            t.Description,
-            t.Status,
-            t.Priority,
-            t.CreatedAt,
-            t.ClosedAt,
-            t.AssignedToId,
-            t.AssignedTo?.UserName,
-            t.CreatedBy?.UserName ?? "Unknown",
-            t.CreatedById);
+            t.Id, t.Title, t.Description,
+            t.Status, t.Priority,
+            t.CreatedAt, t.ClosedAt,
+            t.AssignedToId, t.AssignedTo?.UserName,
+            t.CreatedBy?.UserName ?? "Unknown", t.CreatedById);
     }
 }

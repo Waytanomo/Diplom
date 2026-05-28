@@ -8,42 +8,46 @@
 </head>
 <body>
 
-<nav class="tm-nav">
-    <div class="container">
-        <a class="nav-brand" asp-controller="HomePage" asp-action="Index">
-            <span class="nav-brand-dot"></span>
-            TicketMonitor
-        </a>
-        <ul class="nav-links" id="nav-links">
-            <li>
-                <a asp-controller="TicketsPage" asp-action="Index">Tickets</a>
-            </li>
-            <li id="nav-dashboard" style="display:none">
-                <a asp-controller="DashboardPage" asp-action="Index">Dashboard</a>
-            </li>
-            <li id="nav-admin" style="display:none">
-                <a asp-controller="AdminPage" asp-action="Users">Admin</a>
-            </li>
-            <li>
-                <span class="nav-username" id="nav-username" style="display:none"></span>
-            </li>
-            <li id="nav-login">
-                <a asp-controller="AuthPage" asp-action="Login">Login</a>
-            </li>
-            <li id="nav-logout" style="display:none">
-                <button id="nav-logout">Logout</button>
-            </li>
-        </ul>
-    </div>
-</nav>
+    <nav class="tm-nav">
+        <div class="container">
+            <a class="nav-brand" asp-controller="HomePage" asp-action="Index">
+                <span class="nav-brand-dot"></span>
+                TicketMonitor
+            </a>
+            <ul class="nav-links" id="nav-links">
+                <li>
+                    <a asp-controller="TicketsPage" asp-action="Index" data-i18n="nav.tickets">Tickets</a>
+                </li>
+                <li id="nav-dashboard" style="display:none">
+                    <a asp-controller="DashboardPage" asp-action="Index" data-i18n="nav.dashboard">Dashboard</a>
+                </li>
+                <li id="nav-admin" style="display:none">
+                    <a asp-controller="AdminPage" asp-action="Users" data-i18n="nav.admin">Admin</a>
+                </li>
+                <li>
+                    <span class="nav-username" id="nav-username" style="display:none"></span>
+                </li>
+                <li>
+                    <div id="lang-switcher"></div>
+                </li>
+                <li id="nav-login">
+                    <a asp-controller="AuthPage" asp-action="Login" data-i18n="nav.login">Login</a>
+                </li>
+                <li id="nav-logout" style="display:none">
+                    <button id="nav-logout" data-i18n="nav.logout">Logout</button>
+                </li>>
+            </ul>
+        </div>
+    </nav>
 
-<main class="tm-main">
-    @RenderBody()
-</main>
+    <main class="tm-main">
+        @RenderBody()
+    </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@8.0.7/dist/browser/signalr.min.js"></script>
-<script src="~/js/site.js" asp-append-version="true"></script>
-@await RenderSectionAsync("Scripts", required: false)
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@@8.0.7/dist/browser/signalr.min.js"></script>
+    <script src="~/js/i18n.js" asp-append-version="true"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
 
 </body>
 </html>

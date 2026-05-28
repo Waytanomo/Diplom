@@ -1,11 +1,14 @@
 @{
-    ViewData["Title"] = "Create Ticket";
+    ViewData["Title"] = "New Ticket";
 }
 
 <div class="page-header">
     <div>
-        <a asp-controller="TicketsPage" asp-action="Index" class="tm-btn tm-btn-ghost tm-btn-sm" style="margin-bottom:12px;display:inline-flex">← Back to Tickets</a>
-        <h1 class="page-title">New Ticket</h1>
+        <a asp-controller="TicketsPage" asp-action="Index"
+           class="tm-btn tm-btn-ghost tm-btn-sm"
+           style="margin-bottom:12px;display:inline-flex"
+           data-i18n="create.back">← Back to Tickets</a>
+        <h1 class="page-title" data-i18n="create.title">New Ticket</h1>
     </div>
 </div>
 
@@ -15,77 +18,97 @@
             <div id="errorMsg" class="tm-alert tm-alert-danger"></div>
 
             <div class="tm-form-group">
-                <label class="tm-label" for="title">Title</label>
-                <input type="text" class="tm-input" id="title" placeholder="Brief description of the issue" maxlength="100" />
-                <div style="text-align:right;font-size:0.75rem;color:var(--text-muted);margin-top:4px"><span id="titleCount">0</span>/100</div>
+                <label class="tm-label" for="title" data-i18n="create.field_title">Title</label>
+                <input type="text" class="tm-input" id="title"
+                       data-i18n-placeholder="create.placeholder_title"
+                       placeholder="Brief description of the issue"
+                       maxlength="100" />
+                <div style="text-align:right;font-size:0.75rem;color:var(--text-muted);margin-top:4px">
+                    <span id="titleCount">0</span>/100
+                </div>
             </div>
 
             <div class="tm-form-group">
-                <label class="tm-label" for="description">Description</label>
-                <textarea class="tm-textarea" id="description" rows="8" placeholder="Provide full details about the issue…" maxlength="5000"></textarea>
-                <div style="text-align:right;font-size:0.75rem;color:var(--text-muted);margin-top:4px"><span id="descCount">0</span>/5000</div>
+                <label class="tm-label" for="description" data-i18n="create.field_desc">Description</label>
+                <textarea class="tm-textarea" id="description" rows="8"
+                          data-i18n-placeholder="create.placeholder_desc"
+                          placeholder="Provide full details about the issue…"
+                          maxlength="5000"></textarea>
+                <div style="text-align:right;font-size:0.75rem;color:var(--text-muted);margin-top:4px">
+                    <span id="descCount">0</span>/5000
+                </div>
             </div>
 
             <div class="tm-form-group">
-                <label class="tm-label" for="priority">Priority</label>
+                <label class="tm-label" for="priority" data-i18n="create.field_prio">Priority</label>
                 <select class="tm-select" id="priority">
-                    <option value="0">🟢 Low</option>
-                    <option value="1" selected>🔵 Medium</option>
-                    <option value="2">🟠 High</option>
-                    <option value="3">🔴 Critical</option>
+                    <option value="0" data-i18n="priority.Low">Low</option>
+                    <option value="1" selected data-i18n="priority.Medium">Medium</option>
+                    <option value="2" data-i18n="priority.High">High</option>
+                    <option value="3" data-i18n="priority.Critical">Critical</option>
                 </select>
             </div>
 
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
-                <a asp-controller="TicketsPage" asp-action="Index" class="tm-btn tm-btn-secondary">Cancel</a>
-                <button class="tm-btn tm-btn-primary" id="submitBtn">Create Ticket</button>
+                <a asp-controller="TicketsPage" asp-action="Index"
+                   class="tm-btn tm-btn-secondary"
+                   data-i18n="create.cancel">Cancel</a>
+                <button class="tm-btn tm-btn-primary" id="submitBtn"
+                        data-i18n="create.submit">
+                    Create Ticket
+                </button>
             </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    requireAuth(['Manager', 'Client', 'Administrator']);
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            requireAuth(['Manager', 'Client', 'Administrator']);
 
-    const titleEl = document.getElementById('title');
-    const descEl = document.getElementById('description');
+            var titleEl = document.getElementById('title');
+            var descEl  = document.getElementById('description');
 
-    titleEl.addEventListener('input', () =>
-        document.getElementById('titleCount').textContent = titleEl.value.length);
-    descEl.addEventListener('input', () =>
-        document.getElementById('descCount').textContent = descEl.value.length);
+            titleEl.addEventListener('input', function () {
+                document.getElementById('titleCount').textContent = titleEl.value.length;
+            });
+            descEl.addEventListener('input', function () {
+                document.getElementById('descCount').textContent = descEl.value.length;
+            });
 
-    document.getElementById('submitBtn').addEventListener('click', async () => {
-        const errorMsg = document.getElementById('errorMsg');
-        errorMsg.classList.remove('show');
+            document.getElementById('submitBtn').addEventListener('click', function () {
+                var errorMsg    = document.getElementById('errorMsg');
+                var title       = titleEl.value.trim();
+                var description = descEl.value.trim();
+                var priority    = parseInt(document.getElementById('priority').value);
 
-        const title = titleEl.value.trim();
-        const description = descEl.value.trim();
-        const priority = parseInt(document.getElementById('priority').value);
+                errorMsg.classList.remove('show');
+                if (!title)       { errorMsg.textContent = t('create.err_title'); errorMsg.classList.add('show'); return; }
+                if (!description) { errorMsg.textContent = t('create.err_desc');  errorMsg.classList.add('show'); return; }
 
-        if (!title) { errorMsg.textContent = 'Title is required'; errorMsg.classList.add('show'); return; }
-        if (!description) { errorMsg.textContent = 'Description is required'; errorMsg.classList.add('show'); return; }
+                var btn = this;
+                btn.disabled    = true;
+                btn.textContent = t('create.creating');
 
-        const btn = document.getElementById('submitBtn');
-        btn.disabled = true; btn.textContent = 'Creating…';
+                API.post('/api/tickets', { title: title, description: description, priority: priority })
+                    .then(function (res) {
+                        if (!res.ok) return res.json().then(function (e) { throw new Error(e.message || t('common.error')); });
+                        return res.json();
+                    })
+                    .then(function (ticket) {
+                        Notifications.success('✓');
+                        setTimeout(function () { window.location.href = '/TicketsPage/Details/' + ticket.id; }, 600);
+                    })
+                    .catch(function (err) {
+                        errorMsg.textContent = err.message;
+                        errorMsg.classList.add('show');
+                        btn.disabled    = false;
+                        btn.textContent = t('create.submit');
+                    });
+            });
 
-        try {
-            const res = await API.post('/api/tickets', { title, description, priority });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.message || 'Failed to create ticket');
-            }
-            const ticket = await res.json();
-            Notifications.success('Ticket created!');
-            setTimeout(() => window.location.href = `/TicketsPage/Details/${ticket.id}`, 600);
-        } catch (err) {
-            errorMsg.textContent = err.message;
-            errorMsg.classList.add('show');
-            btn.disabled = false; btn.textContent = 'Create Ticket';
-        }
-    });
-});
-</script>
+            document.addEventListener('tm:langChanged', function () { I18n.applyToPage(); });
+        });
+    </script>
 }

@@ -4,37 +4,45 @@
 
 <div class="page-header">
     <div>
-        <h1 class="page-title">Tickets</h1>
-        <p class="page-subtitle" id="ticketCount">Loading…</p>
+        <h1 class="page-title" data-i18n="tickets.title">Tickets</h1>
+        <p class="page-subtitle" id="ticketCount" data-i18n="tickets.loading">Loading…</p>
     </div>
-    <a class="tm-btn tm-btn-primary" asp-controller="TicketsPage" asp-action="Create" id="createBtn" style="display:none">
-        + New Ticket
-    </a>
+    <a class="tm-btn tm-btn-primary"
+       asp-controller="TicketsPage" asp-action="Create"
+       id="createBtn" style="display:none"
+       data-i18n="tickets.new">+ New Ticket</a>
+</div>
+
+<div id="filteredNotice" style="display:none;margin-bottom:16px;
+    background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);
+    border-radius:10px;padding:12px 16px;font-size:0.875rem;color:#a5b4fc">
 </div>
 
 <div class="filters-bar">
     <div class="search-input-wrap">
         <span class="search-icon">⌕</span>
-        <input type="text" class="tm-input" id="searchInput" placeholder="Search tickets…" />
+        <input type="text" class="tm-input" id="searchInput"
+               data-i18n-placeholder="tickets.search"
+               placeholder="Search tickets…" />
     </div>
     <select class="tm-select" id="statusFilter" style="width:auto;min-width:130px">
-        <option value="">All Statuses</option>
-        <option value="Open">Open</option>
-        <option value="InProgress">In Progress</option>
-        <option value="Resolved">Resolved</option>
-        <option value="Closed">Closed</option>
+        <option value="" data-i18n="tickets.all_statuses">All Statuses</option>
+        <option value="Open" data-i18n="status.Open">Open</option>
+        <option value="InProgress" data-i18n="status.InProgress">In Progress</option>
+        <option value="Resolved" data-i18n="status.Resolved">Resolved</option>
+        <option value="Closed" data-i18n="status.Closed">Closed</option>
     </select>
     <select class="tm-select" id="priorityFilter" style="width:auto;min-width:130px">
-        <option value="">All Priorities</option>
-        <option value="Low">Low</option>
-        <option value="Medium">Medium</option>
-        <option value="High">High</option>
-        <option value="Critical">Critical</option>
+        <option value="" data-i18n="tickets.all_priorities">All Priorities</option>
+        <option value="Low" data-i18n="priority.Low">Low</option>
+        <option value="Medium" data-i18n="priority.Medium">Medium</option>
+        <option value="High" data-i18n="priority.High">High</option>
+        <option value="Critical" data-i18n="priority.Critical">Critical</option>
     </select>
     <select class="tm-select" id="pageSizeSelect" style="width:auto">
-        <option value="10">10 / page</option>
-        <option value="25">25 / page</option>
-        <option value="50">50 / page</option>
+        <option value="10">10 / <span data-i18n="tickets.per_page">page</span></option>
+        <option value="25">25 / <span data-i18n="tickets.per_page">page</span></option>
+        <option value="50">50 / <span data-i18n="tickets.per_page">page</span></option>
     </select>
 </div>
 
@@ -43,12 +51,12 @@
         <table class="tm-table">
             <thead>
                 <tr>
-                    <th>#</th>
-                    <th>Title</th>
-                    <th>Status</th>
-                    <th>Priority</th>
-                    <th>Assigned To</th>
-                    <th>Created</th>
+                    <th data-i18n="col.id">#</th>
+                    <th data-i18n="col.title">Title</th>
+                    <th data-i18n="col.status">Status</th>
+                    <th data-i18n="col.priority">Priority</th>
+                    <th data-i18n="col.assigned">Assigned To</th>
+                    <th data-i18n="col.created">Created</th>
                 </tr>
             </thead>
             <tbody id="ticketsBody">
@@ -63,117 +71,129 @@
 </div>
 
 @section Scripts {
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    requireAuth();
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            requireAuth();
 
-    const user = Auth.getUser();
-    const canCreate = Auth.hasAnyRole('Manager', 'Client', 'Administrator');
-    if (canCreate) document.getElementById('createBtn').style.display = '';
+            if (Auth.hasAnyRole('Manager', 'Client', 'Administrator'))
+                document.getElementById('createBtn').style.display = '';
 
-    let state = { page: 1, pageSize: 10, status: '', priority: '', search: '' };
-    let searchTimer;
+            var state = { page: 1, pageSize: 10, status: '', priority: '', search: '' };
+            var searchTimer;
 
-    async function load() {
-        const params = new URLSearchParams();
-        params.set('page', state.page);
-        params.set('pageSize', state.pageSize);
-        if (state.status) params.set('status', state.status);
-        if (state.priority) params.set('priority', state.priority);
-        if (state.search) params.set('search', state.search);
+            function load() {
+                var params = new URLSearchParams();
+                params.set('page',     state.page);
+                params.set('pageSize', state.pageSize);
+                if (state.status)   params.set('status',   state.status);
+                if (state.priority) params.set('priority', state.priority);
+                if (state.search)   params.set('search',   state.search);
 
-        const tbody = document.getElementById('ticketsBody');
-        tbody.innerHTML = '<tr><td colspan="6"><div class="loading-overlay"><div class="tm-spinner"></div></div></td></tr>';
+                var tbody = document.getElementById('ticketsBody');
+                tbody.innerHTML = '<tr><td colspan="6"><div class="loading-overlay"><div class="tm-spinner"></div></div></td></tr>';
 
-        try {
-            const res = await API.get('/api/tickets?' + params);
-            if (!res.ok) throw new Error('Failed to load');
-            const data = await res.json();
-            renderTickets(data);
-        } catch (err) {
-            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">⚠</div><div class="empty-text">${err.message}</div></div></td></tr>`;
-        }
-    }
-
-    function renderTickets(data) {
-        const tbody = document.getElementById('ticketsBody');
-        const items = data.items || [];
-
-        document.getElementById('ticketCount').textContent = `${data.total} ticket${data.total !== 1 ? 's' : ''}`;
-
-        if (items.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="empty-icon">🎫</div><div class="empty-text">No tickets found</div></div></td></tr>`;
-            document.getElementById('pagination').style.display = 'none';
-            return;
-        }
-
-        tbody.innerHTML = items.map(t => `
-            <tr onclick="window.location.href='/TicketsPage/Details/${t.id}'">
-                <td><span class="ticket-id">#${t.id}</span></td>
-                <td><span class="ticket-title-cell">${Helpers.escapeHtml(t.title)}</span></td>
-                <td>${Helpers.statusBadge(t.status)}</td>
-                <td>${Helpers.priorityBadge(t.priority)}</td>
-                <td style="color:var(--text-secondary);font-size:0.85rem">${t.assignedToName ? Helpers.escapeHtml(t.assignedToName) : '<span style="color:var(--text-muted)">Unassigned</span>'}</td>
-                <td style="color:var(--text-muted);font-size:0.8rem;font-family:var(--font-mono)">${Helpers.formatDate(t.createdAt)}</td>
-            </tr>
-        `).join('');
-
-        renderPagination(data);
-    }
-
-    function renderPagination(data) {
-        const pg = document.getElementById('pagination');
-        const info = document.getElementById('paginationInfo');
-        const pages = document.getElementById('paginationPages');
-
-        const start = (data.page - 1) * data.pageSize + 1;
-        const end = Math.min(data.page * data.pageSize, data.total);
-        info.textContent = `${start}–${end} of ${data.total}`;
-
-        const totalPages = data.totalPages;
-        if (totalPages <= 1) { pg.style.display = 'none'; return; }
-        pg.style.display = '';
-
-        let html = `<button class="page-btn" ${data.page <= 1 ? 'disabled' : ''} onclick="goPage(${data.page - 1})">‹</button>`;
-
-        for (let i = 1; i <= totalPages; i++) {
-            if (i === 1 || i === totalPages || Math.abs(i - data.page) <= 1) {
-                html += `<button class="page-btn${i === data.page ? ' active' : ''}" onclick="goPage(${i})">${i}</button>`;
-            } else if (Math.abs(i - data.page) === 2) {
-                html += `<span style="color:var(--text-muted);padding:0 4px">…</span>`;
+                API.get('/api/tickets?' + params.toString())
+                    .then(function (res) {
+                        if (!res.ok) throw new Error(t('common.error'));
+                        return res.json();
+                    })
+                    .then(function (data) { renderTickets(data); })
+                    .catch(function (err) {
+                        tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">' +
+                            '<div class="empty-icon">⚠</div>' +
+                            '<div class="empty-text">' + Helpers.escapeHtml(err.message) + '</div>' +
+                            '</div></td></tr>';
+                    });
             }
-        }
 
-        html += `<button class="page-btn" ${data.page >= totalPages ? 'disabled' : ''} onclick="goPage(${data.page + 1})">›</button>`;
-        pages.innerHTML = html;
-    }
+            function renderTickets(data) {
+                var tbody = document.getElementById('ticketsBody');
+                var items = data.items || [];
 
-    window.goPage = (p) => { state.page = p; load(); };
+                var notice = document.getElementById('filteredNotice');
+                if (data.isFiltered) {
+                    notice.textContent = t('tickets.my_notice');
+                    notice.style.display = '';
+                } else {
+                    notice.style.display = 'none';
+                }
 
-    document.getElementById('statusFilter').addEventListener('change', e => {
-        state.status = e.target.value; state.page = 1; load();
-    });
-    document.getElementById('priorityFilter').addEventListener('change', e => {
-        state.priority = e.target.value; state.page = 1; load();
-    });
-    document.getElementById('pageSizeSelect').addEventListener('change', e => {
-        state.pageSize = parseInt(e.target.value); state.page = 1; load();
-    });
-    document.getElementById('searchInput').addEventListener('input', e => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => {
-            state.search = e.target.value.trim();
-            state.page = 1;
+                var word = data.total === 1 ? t('tickets.count_one') : t('tickets.count_many');
+                document.getElementById('ticketCount').textContent = data.total + ' ' + word;
+
+                if (!items.length) {
+                    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state">' +
+                        '<div class="empty-icon">🎫</div>' +
+                        '<div class="empty-text">' + t('tickets.empty') + '</div>' +
+                        '</div></td></tr>';
+                    document.getElementById('pagination').style.display = 'none';
+                    return;
+                }
+
+                tbody.innerHTML = items.map(function (ticket) {
+                    return '<tr onclick="window.location.href=\'/TicketsPage/Details/' + ticket.id + '\'">' +
+                        '<td><span class="ticket-id">#' + ticket.id + '</span></td>' +
+                        '<td><span class="ticket-title-cell">' + Helpers.escapeHtml(ticket.title) + '</span></td>' +
+                        '<td>' + Helpers.statusBadge(ticket.status) + '</td>' +
+                        '<td>' + Helpers.priorityBadge(ticket.priority) + '</td>' +
+                        '<td style="color:var(--text-secondary);font-size:0.85rem">' +
+                            (ticket.assignedToName
+                                ? Helpers.escapeHtml(ticket.assignedToName)
+                                : '<span style="color:var(--text-muted)">' + t('tickets.unassigned') + '</span>') +
+                        '</td>' +
+                        '<td style="color:var(--text-muted);font-size:0.8rem;font-family:var(--font-mono)">' +
+                            Helpers.formatDate(ticket.createdAt) +
+                        '</td>' +
+                        '</tr>';
+                }).join('');
+
+                renderPagination(data);
+            }
+
+            function renderPagination(data) {
+                var pg    = document.getElementById('pagination');
+                var info  = document.getElementById('paginationInfo');
+                var pages = document.getElementById('paginationPages');
+
+                var start = (data.page - 1) * data.pageSize + 1;
+                var end   = Math.min(data.page * data.pageSize, data.total);
+                info.textContent = start + '–' + end + ' ' + t('common.of') + ' ' + data.total;
+
+                if (data.totalPages <= 1) { pg.style.display = 'none'; return; }
+                pg.style.display = '';
+
+                var html = '<button class="page-btn" ' + (data.page <= 1 ? 'disabled' : '') +
+                    ' onclick="goPage(' + (data.page - 1) + ')">‹</button>';
+
+                for (var i = 1; i <= data.totalPages; i++) {
+                    if (i === 1 || i === data.totalPages || Math.abs(i - data.page) <= 1) {
+                        html += '<button class="page-btn' + (i === data.page ? ' active' : '') +
+                            '" onclick="goPage(' + i + ')">' + i + '</button>';
+                    } else if (Math.abs(i - data.page) === 2) {
+                        html += '<span style="color:var(--text-muted);padding:0 4px">…</span>';
+                    }
+                }
+                html += '<button class="page-btn" ' + (data.page >= data.totalPages ? 'disabled' : '') +
+                    ' onclick="goPage(' + (data.page + 1) + ')">›</button>';
+                pages.innerHTML = html;
+            }
+
+            window.goPage = function (p) { state.page = p; load(); };
+
+            document.getElementById('statusFilter').addEventListener('change',   function (e) { state.status   = e.target.value; state.page = 1; load(); });
+            document.getElementById('priorityFilter').addEventListener('change', function (e) { state.priority = e.target.value; state.page = 1; load(); });
+            document.getElementById('pageSizeSelect').addEventListener('change', function (e) { state.pageSize = parseInt(e.target.value); state.page = 1; load(); });
+            document.getElementById('searchInput').addEventListener('input', function (e) {
+                clearTimeout(searchTimer);
+                searchTimer = setTimeout(function () { state.search = e.target.value.trim(); state.page = 1; load(); }, 300);
+            });
+
+            document.addEventListener('tm:ticketCreated', function () { load(); });
+            document.addEventListener('tm:ticketUpdated', function () { load(); });
+            document.addEventListener('tm:ticketDeleted', function () { load(); });
+            document.addEventListener('tm:langChanged',   function () { I18n.applyToPage(); load(); });
+
             load();
-        }, 300);
-    });
-
-    // Real-time updates
-    document.addEventListener('tm:ticketCreated', () => load());
-    document.addEventListener('tm:ticketUpdated', () => load());
-    document.addEventListener('tm:ticketDeleted', () => load());
-
-    load();
-});
-</script>
+        });
+    </script>
 }

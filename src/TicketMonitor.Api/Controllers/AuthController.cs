@@ -1,15 +1,16 @@
-﻿using Microsoft.AspNetCore.Identity;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using TicketMonitor.Core.DTOs;
 using TicketMonitor.Core.Entities;
 
 namespace TicketMonitor.Api.Controllers
 {
     public record LoginRequest(string Username, string Password);
-    public record RegisterRequest(string UserName, string Email, string Password, string Role = "Client");
 
     [ApiController]
     [Route("api/[controller]")]
@@ -29,37 +30,16 @@ namespace TicketMonitor.Api.Controllers
             _config = config;
         }
 
-        [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
-        {
-            var user = new ApplicationUser
-            {
-                UserName = request.UserName,
-                Email = request.Email,
-                EmailConfirmed = true
-            };
-
-            var result = await _userManager.CreateAsync(user, request.Password);
-            if (!result.Succeeded)
-                return BadRequest(result.Errors);
-
-            var allowedRoles = new[] { "Administrator", "Manager", "Executor", "Client" };
-            var role = allowedRoles.Contains(request.Role) ? request.Role : "Client";
-            await _userManager.AddToRoleAsync(user, role);
-
-            return Ok(new { message = "User created" });
-        }
-
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
             var user = await _userManager.FindByNameAsync(request.Username);
             if (user == null)
-                return Unauthorized(new { message = "Invalid username or password" });
+                return Unauthorized(new { message = "Неверный логин или пароль" });
 
             var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password, false);
             if (!result.Succeeded)
-                return Unauthorized(new { message = "Invalid username or password" });
+                return Unauthorized(new { message = "Неверный логин или пароль" });
 
             var roles = await _userManager.GetRolesAsync(user);
             var token = GenerateJwt(user, roles);
@@ -85,15 +65,26 @@ namespace TicketMonitor.Api.Controllers
         }
 
         [HttpGet("me")]
-        [Microsoft.AspNetCore.Authorization.Authorize]
+        [Authorize]
         public async Task<IActionResult> Me()
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var user = await _userManager.FindByIdAsync(userId!);
             if (user == null) return Unauthorized();
             var roles = await _userManager.GetRolesAsync(user);
-            return Ok(new { id = user.Id, username = user.UserName, email = user.Email, roles });
+            return Ok(new
+            {
+                id = user.Id,
+                username = user.UserName,
+                email = user.Email,
+                roles
+            });
         }
+
+        // ──────────────────────────────────────────────────────────────
+        // Публичная регистрация УДАЛЕНА.
+        // Создание пользователей — только через UsersController (Admin).
+        // ──────────────────────────────────────────────────────────────
 
         private string GenerateJwt(ApplicationUser user, IList<string> roles)
         {
