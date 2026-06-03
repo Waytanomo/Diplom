@@ -1,33 +1,31 @@
 ﻿// ============================================================
-// TicketMonitor — i18n.js  (RU / EN)
-// Подключать ДО site.js
-// Экспортирует глобально: window.I18n, window.t()
-// ВАЖНО: использует IIFE + window.t = function(...) {}
-// чтобы избежать конфликта с const/let t в других файлах
+// TicketMonitor — i18n.js  v3  (RU / EN)
 // ============================================================
-
 (function (global) {
     'use strict';
-
     var STORAGE_KEY = 'tm_lang';
 
     var translations = {
         en: {
             'nav.tickets': 'Tickets', 'nav.dashboard': 'Dashboard', 'nav.admin': 'Admin',
-            'nav.login': 'Login', 'nav.logout': 'Logout',
+            'nav.login': 'Login', 'nav.logout': 'Log out',
             'tickets.title': 'Tickets', 'tickets.new': '+ New Ticket',
             'tickets.search': 'Search tickets…', 'tickets.all_statuses': 'All Statuses',
             'tickets.all_priorities': 'All Priorities', 'tickets.per_page': '/ page',
             'tickets.unassigned': 'Unassigned', 'tickets.empty': 'No tickets found',
             'tickets.loading': 'Loading…', 'tickets.count_one': 'ticket',
             'tickets.count_many': 'tickets',
-            'tickets.my_notice': '📋 Showing tickets assigned to you or created by you',
+            'tickets.my_notice': '📋 Showing tickets assigned to you',
             'col.id': '#', 'col.title': 'Title', 'col.status': 'Status',
             'col.priority': 'Priority', 'col.assigned': 'Assigned To', 'col.created': 'Created',
             'status.Open': 'Open', 'status.InProgress': 'In Progress',
             'status.Resolved': 'Resolved', 'status.Closed': 'Closed',
             'priority.Low': 'Low', 'priority.Medium': 'Medium',
             'priority.High': 'High', 'priority.Critical': 'Critical',
+            // Роли — задача 4
+            'role.Administrator': 'Administrator',
+            'role.Manager': 'Manager',
+            'role.Executor': 'Executor',
             'ticket.back': '← Back', 'ticket.description': 'Description',
             'ticket.details': 'Details', 'ticket.created_by': 'Created by',
             'ticket.assigned_to': 'Assigned to', 'ticket.created_at': 'Created',
@@ -48,13 +46,11 @@
             'create.placeholder_title': 'Brief description of the issue',
             'create.placeholder_desc': 'Provide full details about the issue…',
             'create.err_title': 'Title is required', 'create.err_desc': 'Description is required',
-            'login.title': 'Welcome back',
-            'login.subtitle': 'Sign in to your TicketMonitor account',
+            'login.title': 'Welcome back', 'login.subtitle': 'Sign in to your TicketMonitor account',
             'login.username': 'Username', 'login.password': 'Password',
             'login.submit': 'Sign In', 'login.signing': 'Signing in…',
             'login.error_empty': 'Please enter username and password',
-            'dashboard.title': 'Dashboard',
-            'dashboard.subtitle': 'Real-time ticket analytics',
+            'dashboard.title': 'Dashboard', 'dashboard.subtitle': 'Real-time ticket analytics',
             'dashboard.refresh': '↻ Refresh', 'dashboard.total': 'Total Tickets',
             'dashboard.open': 'Open', 'dashboard.inprogress': 'In Progress',
             'dashboard.resolved': 'Resolved', 'dashboard.avg': 'Avg Resolution',
@@ -67,24 +63,22 @@
             'home.open': 'Open Tickets', 'home.inprogress': 'In Progress',
             'admin.title': 'User Management', 'admin.subtitle': 'Manage users and roles',
             'admin.add_user': '+ Add User', 'admin.col_username': 'Username',
-            'admin.col_email': 'Email', 'admin.col_role': 'Role',
-            'admin.col_actions': 'Actions', 'admin.you': 'you', 'admin.delete': 'Delete',
+            'admin.col_role': 'Role', 'admin.col_actions': 'Actions',
+            'admin.you': 'you', 'admin.delete': 'Delete',
             'admin.delete_confirm': 'Delete user "{name}"? This cannot be undone.',
             'admin.no_users': 'No users found',
             'user.create_title': 'Create User', 'user.field_username': 'Username',
             'user.field_password': 'Password', 'user.field_role': 'Role',
-            'user.field_email': 'Email (optional)',
-            'user.email_hint': 'If empty: username@local.tier',
             'user.submit': 'Create User', 'user.creating': 'Creating…', 'user.cancel': 'Cancel',
             'user.err_username': 'Username is required',
             'user.err_password': 'Password must be at least 6 characters',
             'notify.ticket_created': 'New ticket: "{title}"',
             'notify.ticket_deleted': 'Ticket #{id} was deleted',
             'notify.status_changed': 'Ticket #{id}: {old} → {new}',
-            'notify.session_expiring': 'Your session expires in 2 minutes. Please save your work.',
+            'notify.session_expiring': 'Your session expires in 2 minutes.',
             'notify.session_expired': 'Session expired. Please log in again.',
             'common.loading': 'Loading…', 'common.error': 'Something went wrong',
-            'common.of': 'of', 'common.unassigned': 'Unassigned', 'common.auto_email': '(auto)',
+            'common.of': 'of', 'common.unassigned': 'Unassigned',
         },
         ru: {
             'nav.tickets': 'Тикеты', 'nav.dashboard': 'Дашборд',
@@ -95,13 +89,17 @@
             'tickets.unassigned': 'Не назначен', 'tickets.empty': 'Тикеты не найдены',
             'tickets.loading': 'Загрузка…', 'tickets.count_one': 'тикет',
             'tickets.count_many': 'тикетов',
-            'tickets.my_notice': '📋 Показаны тикеты, назначенные вам или созданные вами',
+            'tickets.my_notice': '📋 Показаны тикеты, назначенные вам',
             'col.id': '№', 'col.title': 'Название', 'col.status': 'Статус',
             'col.priority': 'Приоритет', 'col.assigned': 'Исполнитель', 'col.created': 'Создан',
             'status.Open': 'Открыт', 'status.InProgress': 'В работе',
             'status.Resolved': 'Решён', 'status.Closed': 'Закрыт',
             'priority.Low': 'Низкий', 'priority.Medium': 'Средний',
             'priority.High': 'Высокий', 'priority.Critical': 'Критический',
+            // Роли — задача 4
+            'role.Administrator': 'Администратор',
+            'role.Manager': 'Менеджер',
+            'role.Executor': 'Исполнитель',
             'ticket.back': '← Назад', 'ticket.description': 'Описание',
             'ticket.details': 'Детали', 'ticket.created_by': 'Создал',
             'ticket.assigned_to': 'Исполнитель', 'ticket.created_at': 'Создан',
@@ -122,13 +120,11 @@
             'create.placeholder_title': 'Краткое описание проблемы',
             'create.placeholder_desc': 'Подробно опишите суть проблемы…',
             'create.err_title': 'Укажите название', 'create.err_desc': 'Укажите описание',
-            'login.title': 'С возвращением',
-            'login.subtitle': 'Войдите в аккаунт TicketMonitor',
+            'login.title': 'С возвращением', 'login.subtitle': 'Войдите в аккаунт TicketMonitor',
             'login.username': 'Имя пользователя', 'login.password': 'Пароль',
             'login.submit': 'Войти', 'login.signing': 'Вход…',
             'login.error_empty': 'Введите имя пользователя и пароль',
-            'dashboard.title': 'Дашборд',
-            'dashboard.subtitle': 'Аналитика тикетов в реальном времени',
+            'dashboard.title': 'Дашборд', 'dashboard.subtitle': 'Аналитика в реальном времени',
             'dashboard.refresh': '↻ Обновить', 'dashboard.total': 'Всего тикетов',
             'dashboard.open': 'Открытые', 'dashboard.inprogress': 'В работе',
             'dashboard.resolved': 'Решённые', 'dashboard.avg': 'Среднее время',
@@ -142,14 +138,13 @@
             'admin.title': 'Управление пользователями',
             'admin.subtitle': 'Управление аккаунтами и ролями',
             'admin.add_user': '+ Добавить пользователя', 'admin.col_username': 'Пользователь',
-            'admin.col_email': 'Email', 'admin.col_role': 'Роль',
-            'admin.col_actions': 'Действия', 'admin.you': 'вы', 'admin.delete': 'Удалить',
+            'admin.col_role': 'Роль', 'admin.col_actions': 'Действия',
+            'admin.you': 'вы', 'admin.delete': 'Удалить',
             'admin.delete_confirm': 'Удалить пользователя "{name}"? Это нельзя отменить.',
             'admin.no_users': 'Пользователи не найдены',
             'user.create_title': 'Создать пользователя',
             'user.field_username': 'Имя пользователя', 'user.field_password': 'Пароль',
-            'user.field_role': 'Роль', 'user.field_email': 'Email (необязательно)',
-            'user.email_hint': 'Если не указан: username@local.tier',
+            'user.field_role': 'Роль',
             'user.submit': 'Создать пользователя', 'user.creating': 'Создание…',
             'user.cancel': 'Отмена',
             'user.err_username': 'Имя пользователя обязательно',
@@ -157,10 +152,10 @@
             'notify.ticket_created': 'Новый тикет: "{title}"',
             'notify.ticket_deleted': 'Тикет #{id} удалён',
             'notify.status_changed': 'Тикет #{id}: {old} → {new}',
-            'notify.session_expiring': 'Сессия истекает через 2 минуты. Сохраните работу.',
+            'notify.session_expiring': 'Сессия истекает через 2 минуты.',
             'notify.session_expired': 'Сессия истекла. Пожалуйста, войдите снова.',
             'common.loading': 'Загрузка…', 'common.error': 'Что-то пошло не так',
-            'common.of': 'из', 'common.unassigned': 'Не назначен', 'common.auto_email': '(авто)',
+            'common.of': 'из', 'common.unassigned': 'Не назначен',
         }
     };
 
@@ -223,7 +218,6 @@
         });
     }
 
-    // Публичный объект
     var I18n = {
         t: translate,
         getLang: function () { return currentLang; },
@@ -233,11 +227,6 @@
     };
 
     global.I18n = I18n;
-
-    // Глобальная функция t() — обычное объявление function, не const/let,
-    // поэтому не конфликтует ни с чем
-    global.t = function t(key, vars) {
-        return I18n.t(key, vars);
-    };
+    global.t = function t(key, vars) { return I18n.t(key, vars); };
 
 }(window));

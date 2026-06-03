@@ -1,6 +1,6 @@
 ﻿// ============================================================
-// TicketMonitor — site.js
-// Зависит от i18n.js (подключается раньше в _Layout.cshtml)
+// TicketMonitor — site.js  v3
+// Зависит от: i18n.js
 // ============================================================
 
 var API = {
@@ -11,10 +11,7 @@ var API = {
         if (token) headers['Authorization'] = 'Bearer ' + token;
         return fetch(url, Object.assign({}, options, { headers: headers }))
             .then(function (res) {
-                if (res.status === 401) {
-                    Auth.handleExpired();
-                    throw new Error('Unauthorized');
-                }
+                if (res.status === 401) { Auth.handleExpired(); throw new Error('Unauthorized'); }
                 return res;
             });
     },
@@ -60,10 +57,12 @@ var Auth = {
     },
     hasAnyRole: function () {
         var self = this;
-        for (var i = 0; i < arguments.length; i++) {
-            if (self.hasRole(arguments[i])) return true;
-        }
+        for (var i = 0; i < arguments.length; i++) { if (self.hasRole(arguments[i])) return true; }
         return false;
+    },
+    getFirstRole: function () {
+        var user = this.getUser();
+        return (user && user.roles && user.roles[0]) || '';
     },
     handleExpired: function () {
         this.clearSession();
@@ -85,23 +84,21 @@ var Auth = {
         if (ms <= 0) return;
         var warnMs = ms - 2 * 60 * 1000;
         if (warnMs > 0) {
-            setTimeout(function () {
-                Notifications.warning(t('notify.session_expiring'));
-            }, warnMs);
+            setTimeout(function () { Notifications.warning(t('notify.session_expiring')); }, warnMs);
         }
         setTimeout(function () { self.handleExpired(); }, ms);
     }
 };
 
 var Notifications = {
-    _container: null,
+    _c: null,
     _init: function () {
-        if (this._container) return;
-        this._container = document.createElement('div');
-        this._container.style.cssText =
+        if (this._c) return;
+        this._c = document.createElement('div');
+        this._c.style.cssText =
             'position:fixed;top:20px;right:20px;z-index:9999;' +
             'display:flex;flex-direction:column;gap:8px;max-width:360px;pointer-events:none';
-        document.body.appendChild(this._container);
+        document.body.appendChild(this._c);
     },
     show: function (msg, type, duration) {
         type = type || 'info';
@@ -120,17 +117,16 @@ var Notifications = {
         el.innerHTML = '<span style="color:' + colors[type] + ';font-size:16px">' +
             icons[type] + '</span>' + msg;
         el.addEventListener('click', function () { el.remove(); });
-        this._container.appendChild(el);
+        this._c.appendChild(el);
         if (duration > 0) { setTimeout(function () { if (el.parentNode) el.remove(); }, duration); }
-        return el;
     },
-    success: function (msg) { return Notifications.show(msg, 'success'); },
-    error: function (msg) { return Notifications.show(msg, 'error'); },
-    warning: function (msg) { return Notifications.show(msg, 'warning'); },
-    info: function (msg) { return Notifications.show(msg, 'info'); }
+    success: function (msg) { Notifications.show(msg, 'success'); },
+    error: function (msg) { Notifications.show(msg, 'error'); },
+    warning: function (msg) { Notifications.show(msg, 'warning'); },
+    info: function (msg) { Notifications.show(msg, 'info'); }
 };
 
-// Добавляем CSS-анимацию тостов
+// CSS анимации + переключатель языка + dropdown стили
 (function () {
     var s = document.createElement('style');
     s.textContent =
@@ -138,8 +134,7 @@ var Notifications = {
         '.lang-btn{background:none;border:none;cursor:pointer;color:var(--text-muted);' +
         'font-size:0.75rem;font-weight:600;font-family:var(--font-mono);padding:2px 4px;' +
         'border-radius:4px;transition:color 0.15s;letter-spacing:0.05em}' +
-        '.lang-btn:hover{color:var(--text-primary)}' +
-        '.lang-btn.active{color:var(--accent)}' +
+        '.lang-btn:hover{color:var(--text-primary)}.lang-btn.active{color:var(--accent)}' +
         '#lang-switcher{display:flex;align-items:center;gap:4px}';
     document.head.appendChild(s);
 }());
@@ -154,7 +149,6 @@ var TM_SignalR = {
             .withUrl('/hubs/tickets', { accessTokenFactory: function () { return token; } })
             .withAutomaticReconnect()
             .build();
-
         this.connection.on('TicketCreated', function (ticket) {
             Notifications.info(t('notify.ticket_created', { title: ticket.title }));
             document.dispatchEvent(new CustomEvent('tm:ticketCreated', { detail: ticket }));
@@ -180,42 +174,91 @@ var TM_SignalR = {
         this.connection.on('TicketAssigned', function (data) {
             document.dispatchEvent(new CustomEvent('tm:ticketAssigned', { detail: data }));
         });
-
         this.connection.start().catch(function (e) { console.warn('SignalR:', e); });
     },
-    joinTicket: function (ticketId) {
+    joinTicket: function (id) {
         if (this.connection && this.connection.state === 'Connected')
-            this.connection.invoke('JoinTicketGroup', String(ticketId));
+            this.connection.invoke('JoinTicketGroup', String(id));
     },
-    leaveTicket: function (ticketId) {
+    leaveTicket: function (id) {
         if (this.connection && this.connection.state === 'Connected')
-            this.connection.invoke('LeaveTicketGroup', String(ticketId));
+            this.connection.invoke('LeaveTicketGroup', String(id));
     }
 };
 
+// ── Navbar + Dropdown ───────────────────────────────
 function updateNavbar() {
     var user = Auth.getUser();
     var loggedIn = Auth.isLoggedIn();
-    var el;
 
-    el = document.getElementById('nav-login');
-    if (el) el.style.display = loggedIn ? 'none' : '';
+    var loginLi = document.getElementById('nav-login');
+    var userMenu = document.getElementById('nav-user-menu');
+    var adminLi = document.getElementById('nav-admin');
+    var dashLi = document.getElementById('nav-dashboard');
 
-    el = document.getElementById('nav-logout');
-    if (el) el.style.display = loggedIn ? '' : 'none';
+    if (loginLi) loginLi.style.display = loggedIn ? 'none' : '';
+    if (userMenu) userMenu.style.display = loggedIn ? '' : 'none';
 
-    el = document.getElementById('nav-username');
-    if (el) {
-        el.style.display = (loggedIn && user) ? '' : 'none';
-        if (loggedIn && user) el.textContent = user.username;
+    if (loggedIn && user) {
+        var name = user.username || '';
+
+        // Аватар — первая буква имени
+        var avatarEl = document.getElementById('nav-user-avatar');
+        if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
+
+        var nameEl = document.getElementById('nav-username');
+        if (nameEl) nameEl.textContent = name;
+
+        // Заголовок дропдауна
+        var ddName = document.getElementById('nav-dropdown-username');
+        if (ddName) ddName.textContent = name;
+
+        // Роль — локализованная
+        var ddRole = document.getElementById('nav-dropdown-role');
+        if (ddRole) {
+            var firstRole = Auth.getFirstRole();
+            ddRole.textContent = firstRole ? t('role.' + firstRole) : '';
+        }
     }
 
-    el = document.getElementById('nav-admin');
-    if (el) el.style.display = (loggedIn && Auth.hasAnyRole('Administrator')) ? '' : 'none';
-
-    el = document.getElementById('nav-dashboard');
-    if (el) el.style.display = (loggedIn && Auth.hasAnyRole('Administrator', 'Manager')) ? '' : 'none';
+    if (adminLi)
+        adminLi.style.display = (loggedIn && Auth.hasAnyRole('Administrator')) ? '' : 'none';
+    if (dashLi)
+        dashLi.style.display = (loggedIn && Auth.hasAnyRole('Administrator', 'Manager')) ? '' : 'none';
 }
+
+function initUserDropdown() {
+    var btn = document.getElementById('nav-user-btn');
+    var dropdown = document.getElementById('nav-dropdown');
+    if (!btn || !dropdown) return;
+
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = dropdown.classList.contains('open');
+        dropdown.classList.toggle('open', !open);
+        btn.classList.toggle('open', !open);
+    });
+
+    // Клик вне дропдауна — закрываем
+    document.addEventListener('click', function (e) {
+        if (!dropdown.contains(e.target) && e.target !== btn) {
+            dropdown.classList.remove('open');
+            btn.classList.remove('open');
+        }
+    });
+
+    // Logout внутри дропдауна
+    var logoutBtn = document.getElementById('nav-logout');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function (e) {
+            e.preventDefault();
+            dropdown.classList.remove('open');
+            btn.classList.remove('open');
+            Auth.logout();
+        });
+    }
+}
+// ────────────────────────────────────────────────────
 
 function requireAuth(roles) {
     if (!Auth.isLoggedIn()) { window.location.href = '/AuthPage/Login'; return false; }
@@ -233,6 +276,13 @@ var Helpers = {
     priorityBadge: function (priority) {
         var map = { Low: 'priority-low', Medium: 'priority-medium', High: 'priority-high', Critical: 'priority-critical' };
         return '<span class="tm-badge ' + (map[priority] || '') + '">' + t('priority.' + priority) + '</span>';
+    },
+    roleBadge: function (role) {
+        var colors = { Administrator: '#ef4444', Manager: '#f59e0b', Executor: '#6366f1' };
+        var c = colors[role] || 'var(--text-muted)';
+        return '<span style="font-size:0.75rem;font-weight:600;color:' + c + ';' +
+            'background:' + c + '18;padding:2px 8px;border-radius:10px;' +
+            'border:1px solid ' + c + '44">' + t('role.' + role) + '</span>';
     },
     formatDate: function (d) {
         if (!d) return '—';
@@ -266,14 +316,7 @@ document.addEventListener('DOMContentLoaded', function () {
     I18n.initSwitcher();
     I18n.applyToPage();
     updateNavbar();
-
-    var logoutBtn = document.getElementById('nav-logout');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            Auth.logout();
-        });
-    }
+    initUserDropdown();
 
     if (Auth.isLoggedIn()) {
         Auth.scheduleExpiryCheck();
@@ -281,6 +324,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.addEventListener('tm:langChanged', function () {
-        updateNavbar();
+        updateNavbar(); // перерисовывает локализованную роль в дропдауне
     });
 });

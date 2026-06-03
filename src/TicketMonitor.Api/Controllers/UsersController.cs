@@ -15,8 +15,8 @@ namespace TicketMonitor.Api.Controllers
         private readonly ITicketService _svc;
         private readonly UserManager<ApplicationUser> _userManager;
 
-        // Executor исключён из допустимых ролей
-        private static readonly string[] AllowedRoles = { "Administrator", "Manager", "Client" };
+        // Client удалён, Executor возвращён
+        private static readonly string[] AllowedRoles = { "Administrator", "Manager", "Executor" };
 
         public UsersController(ITicketService svc, UserManager<ApplicationUser> userManager)
         {
@@ -27,13 +27,11 @@ namespace TicketMonitor.Api.Controllers
         [HttpGet]
         [Authorize(Roles = "Administrator,Manager")]
         public async Task<IActionResult> GetAll()
-        {
-            return Ok(await _svc.GetUsersAsync());
-        }
+            => Ok(await _svc.GetUsersAsync());
 
         /// <summary>
         /// Создание пользователя администратором.
-        /// Email необязателен — если не передан, генерируется username@local.tier
+        /// Email не принимается — генерируется автоматически как username@local.tier.
         /// </summary>
         [HttpPost]
         [Authorize(Roles = "Administrator")]
@@ -46,35 +44,27 @@ namespace TicketMonitor.Api.Controllers
                 return BadRequest(new { message = "Пароль обязателен" });
 
             if (!AllowedRoles.Contains(request.Role))
-                return BadRequest(new { message = $"Недопустимая роль. Допустимые: {string.Join(", ", AllowedRoles)}" });
+                return BadRequest(new { message = $"Недопустимая роль" });
 
-            // Email: используем переданный или генерируем заглушку
-            var email = !string.IsNullOrWhiteSpace(request.Email)
-                ? request.Email
-                : $"{request.UserName.ToLower().Trim()}@local.tier";
+            // Email всегда генерируется автоматически — не выводится в UI
+            var generatedEmail = $"{request.UserName.Trim().ToLower()}@local.tier";
 
             var user = new ApplicationUser
             {
                 UserName = request.UserName.Trim(),
-                Email = email,
-                EmailConfirmed = true   // подтверждение не требуется во внутренней системе
+                Email = generatedEmail,
+                EmailConfirmed = true
             };
 
             var result = await _userManager.CreateAsync(user, request.Password);
             if (!result.Succeeded)
             {
                 var errors = result.Errors.Select(e => e.Description);
-                return BadRequest(new { message = "Ошибка создания пользователя", errors });
+                return BadRequest(new { message = "Ошибка создания", errors });
             }
 
             await _userManager.AddToRoleAsync(user, request.Role);
-
-            var roles = await _userManager.GetRolesAsync(user);
-            return CreatedAtAction(nameof(GetAll), new UserDto(
-                user.Id,
-                user.UserName ?? "",
-                user.Email ?? "",
-                roles));
+            return CreatedAtAction(nameof(GetAll), new UserDto(user.Id, user.UserName ?? ""));
         }
 
         [HttpPut("{id}/role")]
@@ -82,15 +72,14 @@ namespace TicketMonitor.Api.Controllers
         public async Task<IActionResult> ChangeRole(string id, [FromBody] ChangeRoleRequest request)
         {
             if (!AllowedRoles.Contains(request.Role))
-                return BadRequest(new { message = $"Недопустимая роль" });
+                return BadRequest(new { message = "Недопустимая роль" });
 
             var user = await _userManager.FindByIdAsync(id);
             if (user == null) return NotFound();
 
-            var currentRoles = await _userManager.GetRolesAsync(user);
-            await _userManager.RemoveFromRolesAsync(user, currentRoles);
+            var current = await _userManager.GetRolesAsync(user);
+            await _userManager.RemoveFromRolesAsync(user, current);
             await _userManager.AddToRoleAsync(user, request.Role);
-
             return Ok();
         }
 

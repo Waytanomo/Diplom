@@ -8,17 +8,11 @@ namespace TicketMonitor.Core.DTOs
     public record AddCommentDto(string Text);
 
     public record TicketDto(
-        int Id,
-        string Title,
-        string Description,
-        TicketStatus Status,
-        TicketPriority Priority,
-        DateTime CreatedAt,
-        DateTime? ClosedAt,
-        string? AssignedToId,
-        string? AssignedToName,
-        string CreatedByName,
-        string CreatedById);
+        int Id, string Title, string Description,
+        TicketStatus Status, TicketPriority Priority,
+        DateTime CreatedAt, DateTime? ClosedAt,
+        string? AssignedToId, string? AssignedToName,
+        string CreatedByName, string CreatedById);
 
     public record CommentDto(int Id, string Text, string AuthorName, string AuthorId, DateTime CreatedAt);
 
@@ -29,13 +23,11 @@ namespace TicketMonitor.Core.DTOs
         Dictionary<string, int> ByAssignee,
         double AvgResolutionHours);
 
-    public record UserDto(string Id, string UserName, string Email, IList<string> Roles);
+    // Email удалён из UserDto — не используется в интерфейсе
+    public record UserDto(string Id, string UserName);
 
-    /// <summary>
-    /// Запрос создания пользователя администратором.
-    /// Email необязателен — если не передан, генерируется заглушка username@local.tier
-    /// </summary>
-    public record CreateUserRequest(string UserName, string Password, string Role, string? Email = null);
+    // Email удалён из CreateUserRequest — генерируется автоматически
+    public record CreateUserRequest(string UserName, string Password, string Role);
 
     public class PagedResult<T>
     {
@@ -44,11 +36,6 @@ namespace TicketMonitor.Core.DTOs
         public int Page { get; set; }
         public int PageSize { get; set; }
         public int TotalPages => (int)Math.Ceiling((double)Total / PageSize);
-
-        /// <summary>
-        /// true — если результат отфильтрован по пользователю (не полный доступ).
-        /// Фронтенд показывает соответствующую подпись.
-        /// </summary>
         public bool IsFiltered { get; set; }
     }
 }

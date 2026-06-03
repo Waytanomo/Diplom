@@ -49,10 +49,9 @@ namespace TicketMonitor.Infrastructure.Services
             bool hasFullAccess = callerRoles.Any(r => FullAccessRoles.Contains(r));
             if (!hasFullAccess)
             {
-                // Client: видит тикеты, которые он создал ИЛИ которые ему назначены
-                query = query.Where(t =>
-                    t.CreatedById == callerUserId ||
-                    t.AssignedToId == callerUserId);
+                // Executor: только тикеты, назначенные на него
+                // (создавать не может, поэтому CreatedById не учитываем)
+                query = query.Where(t => t.AssignedToId == callerUserId);
             }
 
             if (!string.IsNullOrWhiteSpace(status) &&
@@ -275,7 +274,7 @@ namespace TicketMonitor.Infrastructure.Services
             foreach (var u in users)
             {
                 var roles = await _userManager.GetRolesAsync(u);
-                result.Add(new UserDto(u.Id, u.UserName ?? "", u.Email ?? "", roles));
+                result.Add(new UserDto(u.Id, u.UserName ?? ""));
             }
             return result;
         }

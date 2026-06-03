@@ -18,13 +18,13 @@ namespace TicketMonitor.Infrastructure.Services
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             using var scope = _scopeFactory.CreateScope();
-            var serviceProvider = scope.ServiceProvider;
+            var sp = scope.ServiceProvider;
+            var roleManager = sp.GetRequiredService<RoleManager<IdentityRole>>();
+            var userManager = sp.GetRequiredService<UserManager<ApplicationUser>>();
 
-            var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-            var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-
-            // Роль Executor УДАЛЕНА. Текущие роли: Administrator, Manager, Client
-            var validRoles = new[] { "Administrator", "Manager", "Client" };
+            // Актуальные роли: Administrator, Manager, Executor
+            // Роль Client УДАЛЕНА
+            var validRoles = new[] { "Administrator", "Manager", "Executor" };
 
             foreach (var role in validRoles)
             {
@@ -32,22 +32,22 @@ namespace TicketMonitor.Infrastructure.Services
                     await roleManager.CreateAsync(new IdentityRole(role));
             }
 
-            // Удаляем роль Executor из БД если она ещё есть
-            var executorRole = await roleManager.FindByNameAsync("Executor");
-            if (executorRole != null)
+            // Миграция: переводим всех Client → Executor
+            var clientRole = await roleManager.FindByNameAsync("Client");
+            if (clientRole != null)
             {
-                // Переназначаем всех Executor → Client
-                var usersInExecutor = await userManager.GetUsersInRoleAsync("Executor");
-                foreach (var u in usersInExecutor)
+                var clientUsers = await userManager.GetUsersInRoleAsync("Client");
+                foreach (var u in clientUsers)
                 {
-                    await userManager.RemoveFromRoleAsync(u, "Executor");
-                    if (!(await userManager.GetRolesAsync(u)).Any())
-                        await userManager.AddToRoleAsync(u, "Client");
+                    await userManager.RemoveFromRoleAsync(u, "Client");
+                    var currentRoles = await userManager.GetRolesAsync(u);
+                    if (!currentRoles.Any())
+                        await userManager.AddToRoleAsync(u, "Executor");
                 }
-                await roleManager.DeleteAsync(executorRole);
+                await roleManager.DeleteAsync(clientRole);
             }
 
-            // Создаём дефолтного админа
+            // Дефолтный admin
             if (!await userManager.Users.AnyAsync(u => u.UserName == "admin", cancellationToken))
             {
                 var admin = new ApplicationUser

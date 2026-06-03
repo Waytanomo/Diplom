@@ -7,7 +7,10 @@
         <h1 class="page-title" data-i18n="admin.title">User Management</h1>
         <p class="page-subtitle" data-i18n="admin.subtitle">Manage users and roles</p>
     </div>
-    <button class="tm-btn tm-btn-primary" id="openCreateModal" data-i18n="admin.add_user">+ Add User</button>
+    <button class="tm-btn tm-btn-primary" id="openCreateModal"
+            data-i18n="admin.add_user">
+        + Add User
+    </button>
 </div>
 
 <div class="tm-card">
@@ -16,23 +19,25 @@
             <thead>
                 <tr>
                     <th data-i18n="admin.col_username">Username</th>
-                    <th data-i18n="admin.col_email">Email</th>
                     <th data-i18n="admin.col_role">Role</th>
                     <th data-i18n="admin.col_actions">Actions</th>
                 </tr>
             </thead>
             <tbody id="usersBody">
-                <tr><td colspan="4"><div class="loading-overlay"><div class="tm-spinner"></div></div></td></tr>
+                <tr>
+                    <td colspan="3">
+                        <div class="loading-overlay"><div class="tm-spinner"></div></div>
+                    </td>
+                </tr>
             </tbody>
         </table>
     </div>
 </div>
 
-<!-- Модальное окно создания пользователя -->
+<!-- Модал создания пользователя -->
 <div id="createUserModal" class="tm-modal-backdrop" style="display:none">
     <div class="tm-modal">
         <div class="modal-title" data-i18n="user.create_title">Create User</div>
-
         <div id="createErrorMsg" class="tm-alert tm-alert-danger"></div>
 
         <div class="tm-form-group">
@@ -48,205 +53,204 @@
         <div class="tm-form-group">
             <label class="tm-label" data-i18n="user.field_role">Role</label>
             <select class="tm-select" id="newRole">
-                <option value="Client">Client</option>
-                <option value="Manager">Manager</option>
-                <option value="Administrator">Administrator</option>
-                <!-- Executor УДАЛЁН -->
+                @* Опции с data-i18n не работают для value-атрибутов,
+                   поэтому текст подставляем через JS при инициализации *@
+                <option value="Executor" id="opt-executor">Executor</option>
+                <option value="Manager" id="opt-manager">Manager</option>
+                <option value="Administrator" id="opt-admin">Administrator</option>
             </select>
         </div>
 
-        <div class="tm-form-group">
-            <label class="tm-label" data-i18n="user.field_email">Email (optional)</label>
-            <input type="email" class="tm-input" id="newEmail"
-                   placeholder="auto: username@local.tier"
-                   autocomplete="off" />
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">
-                Если не указан, будет сгенерирован автоматически
-            </div>
-        </div>
-
         <div class="modal-footer">
-            <button class="tm-btn tm-btn-secondary" id="cancelCreate" data-i18n="user.cancel">Cancel</button>
-            <button class="tm-btn tm-btn-primary" id="submitCreate" data-i18n="user.submit">Create User</button>
+            <button class="tm-btn tm-btn-secondary" id="cancelCreate"
+                    data-i18n="user.cancel">
+                Cancel
+            </button>
+            <button class="tm-btn tm-btn-primary" id="submitCreate"
+                    data-i18n="user.submit">
+                Create User
+            </button>
         </div>
     </div>
 </div>
 
 @section Scripts {
-<script>
-document.addEventListener('DOMContentLoaded', async () => {
-    requireAuth(['Administrator']);
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            requireAuth(['Administrator']);
 
-    // Executor удалён — только эти роли
-    const roles = ['Administrator', 'Manager', 'Client'];
-    const currentUser = Auth.getUser();
+            // Актуальные роли (без Client)
+            var roles = ['Executor', 'Manager', 'Administrator'];
+            var currentUser = Auth.getUser();
 
-    // ── Загрузка пользователей ──────────────────────────────
-    async function loadUsers() {
-        try {
-            const res = await API.get('/api/users');
-            if (!res.ok) throw new Error();
-            const users = await res.json();
-            renderUsers(users);
-        } catch {
-            Notifications.error(t('common.error'));
-        }
-    }
-
-    function renderUsers(users) {
-        const tbody = document.getElementById('usersBody');
-        if (!users.length) {
-            tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">${t('admin.no_users')}</div></td></tr>`;
-            return;
-        }
-
-        const roleColors = {
-            Administrator: '#ef4444',
-            Manager: '#f59e0b',
-            Client: '#10b981'
-        };
-
-        tbody.innerHTML = users.map(u => {
-            const isSelf  = u.id === currentUser?.id;
-            const roleLabel = u.roles?.[0] || 'Client';
-
-            return `
-                <tr>
-                    <td>
-                        <div style="display:flex;align-items:center;gap:10px">
-                            <div style="width:32px;height:32px;border-radius:50%;
-                                background:var(--bg-elevated);border:1px solid var(--border);
-                                display:flex;align-items:center;justify-content:center;
-                                font-size:0.75rem;font-weight:700;color:var(--accent)">
-                                ${Helpers.escapeHtml((u.userName[0] || '?').toUpperCase())}
-                            </div>
-                            <span style="font-weight:500">${Helpers.escapeHtml(u.userName)}</span>
-                            ${isSelf ? `<span style="font-size:0.7rem;color:var(--text-muted);
-                                background:var(--bg-elevated);padding:2px 8px;border-radius:10px;
-                                border:1px solid var(--border)">${t('admin.you')}</span>` : ''}
-                        </div>
-                    </td>
-                    <td style="color:var(--text-secondary);font-size:0.875rem">
-                        ${Helpers.escapeHtml(u.email)}
-                                ${u.email?.endsWith('@@local.tier')
-                            ? '<span style="font-size:0.7rem;color:var(--text-muted);margin-left:6px">(auto)</span>'
-                            : ''}
-                    </td>
-                    <td>
-                        <select class="role-select"
-                            onchange="changeRole('${u.id}', this.value)"
-                            ${isSelf ? 'disabled' : ''}>
-                            ${roles.map(r => `
-                                <option value="${r}" ${r === roleLabel ? 'selected' : ''}
-                                    style="color:${roleColors[r] || 'inherit'}">${r}</option>
-                            `).join('')}
-                        </select>
-                    </td>
-                    <td>
-                        ${!isSelf
-                            ? `<button class="tm-btn tm-btn-danger tm-btn-sm"
-                                onclick="deleteUser('${u.id}', '${Helpers.escapeHtml(u.userName)}')"
-                                data-i18n="admin.delete">${t('admin.delete')}</button>`
-                            : '—'}
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    }
-
-    // ── Смена роли ──────────────────────────────────────────
-    window.changeRole = async (userId, role) => {
-        try {
-            const res = await API.put(`/api/users/${userId}/role`, { role });
-            if (!res.ok) throw new Error();
-            Notifications.success(`✓ ${role}`);
-        } catch {
-            Notifications.error(t('common.error'));
-            loadUsers();
-        }
-    };
-
-    // ── Удаление пользователя ───────────────────────────────
-    window.deleteUser = async (userId, username) => {
-        const msg = t('admin.delete_confirm').replace('{name}', username);
-        if (!confirm(msg)) return;
-        try {
-            const res = await API.delete(`/api/users/${userId}`);
-            if (!res.ok) throw new Error();
-            Notifications.success(t('common.close'));
-            loadUsers();
-        } catch {
-            Notifications.error(t('common.error'));
-        }
-    };
-
-    // ── Модал создания пользователя ─────────────────────────
-    const modal      = document.getElementById('createUserModal');
-    const errorMsg   = document.getElementById('createErrorMsg');
-    const submitBtn  = document.getElementById('submitCreate');
-    const cancelBtn  = document.getElementById('cancelCreate');
-
-    document.getElementById('openCreateModal').addEventListener('click', () => {
-        errorMsg.classList.remove('show');
-        document.getElementById('newUsername').value = '';
-        document.getElementById('newPassword').value = '';
-        document.getElementById('newEmail').value    = '';
-        document.getElementById('newRole').value     = 'Client';
-        modal.style.display = 'flex';
-        setTimeout(() => document.getElementById('newUsername').focus(), 50);
-    });
-
-    cancelBtn.addEventListener('click', () => { modal.style.display = 'none'; });
-    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
-
-    submitBtn.addEventListener('click', async () => {
-        errorMsg.classList.remove('show');
-
-        const userName = document.getElementById('newUsername').value.trim();
-        const password = document.getElementById('newPassword').value;
-        const role     = document.getElementById('newRole').value;
-        const email    = document.getElementById('newEmail').value.trim() || null;
-
-        if (!userName) {
-            errorMsg.textContent = t('user.field_username') + ' — обязательное поле';
-            errorMsg.classList.add('show');
-            return;
-        }
-        if (!password || password.length < 6) {
-            errorMsg.textContent = 'Пароль должен содержать минимум 6 символов';
-            errorMsg.classList.add('show');
-            return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = t('user.creating');
-
-        try {
-            const res = await API.post('/api/users', { userName, password, role, email });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                const msgs = err.errors ? err.errors.join(', ') : (err.message || t('common.error'));
-                throw new Error(msgs);
+            // Локализуем option-ы select в модале
+            function localizeRoleOptions() {
+                roles.forEach(function (r) {
+                    var opt = document.querySelector('#newRole option[value="' + r + '"]');
+                    if (opt) opt.textContent = t('role.' + r);
+                });
             }
-            Notifications.success(`✓ ${userName}`);
-            modal.style.display = 'none';
+            localizeRoleOptions();
+
+            // ── Загрузка пользователей ──────────────────────
+            function loadUsers() {
+                API.get('/api/users')
+                    .then(function (res) { return res.ok ? res.json() : Promise.reject(); })
+                    .then(function (users) { renderUsers(users); })
+                    .catch(function () { Notifications.error(t('common.error')); });
+            }
+
+            function renderUsers(users) {
+                var tbody = document.getElementById('usersBody');
+                if (!users.length) {
+                    tbody.innerHTML = '<tr><td colspan="3"><div class="empty-state">' +
+                        t('admin.no_users') + '</div></td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = users.map(function (u) {
+                    var isSelf = u.id === (currentUser && currentUser.id);
+                    // Роль через API теперь нужно получать отдельно или расширить UserDto
+                    // Пока используем getUsers — предполагаем что UserDto содержит roles
+                    var roleLabel = (u.roles && u.roles[0]) || 'Executor';
+
+                    return '<tr>' +
+                        '<td>' +
+                            '<div style="display:flex;align-items:center;gap:10px">' +
+                                '<div style="width:32px;height:32px;border-radius:50%;' +
+                                    'background:var(--bg-elevated);border:1px solid var(--border);' +
+                                    'display:flex;align-items:center;justify-content:center;' +
+                                    'font-size:0.75rem;font-weight:700;color:var(--accent)">' +
+                                    Helpers.escapeHtml((u.userName[0] || '?').toUpperCase()) +
+                                '</div>' +
+                                '<span style="font-weight:500">' + Helpers.escapeHtml(u.userName) + '</span>' +
+                                (isSelf ? '<span style="font-size:0.7rem;color:var(--text-muted);' +
+                                    'background:var(--bg-elevated);padding:2px 8px;border-radius:10px;' +
+                                    'border:1px solid var(--border)">' + t('admin.you') + '</span>' : '') +
+                            '</div>' +
+                        '</td>' +
+                        '<td>' +
+                            // Локализованный role-бейдж + select для смены
+                            '<div style="display:flex;align-items:center;gap:8px">' +
+                                Helpers.roleBadge(roleLabel) +
+                                (isSelf ? '' :
+                                    '<select class="role-select" onchange="changeRole(\'' + u.id + '\', this.value)">' +
+                                    roles.map(function (r) {
+                                        return '<option value="' + r + '"' + (r === roleLabel ? ' selected' : '') + '>' +
+                                            t('role.' + r) + '</option>';
+                                    }).join('') +
+                                    '</select>'
+                                ) +
+                            '</div>' +
+                        '</td>' +
+                        '<td>' +
+                            (!isSelf
+                                ? '<button class="tm-btn tm-btn-danger tm-btn-sm" ' +
+                                  'onclick="deleteUser(\'' + u.id + '\', \'' + Helpers.escapeHtml(u.userName) + '\')">' +
+                                  t('admin.delete') + '</button>'
+                                : '—') +
+                        '</td>' +
+                        '</tr>';
+                }).join('');
+            }
+
+            // ── Смена роли ──────────────────────────────────
+            window.changeRole = function (userId, role) {
+                API.put('/api/users/' + userId + '/role', { role: role })
+                    .then(function (res) {
+                        if (!res.ok) throw new Error();
+                        Notifications.success(t('role.' + role));
+                    })
+                    .catch(function () {
+                        Notifications.error(t('common.error'));
+                        loadUsers();
+                    });
+            };
+
+            // ── Удаление ────────────────────────────────────
+            window.deleteUser = function (userId, username) {
+                var msg = t('admin.delete_confirm').replace('{name}', username);
+                if (!confirm(msg)) return;
+                API.delete('/api/users/' + userId)
+                    .then(function (res) {
+                        if (!res.ok) throw new Error();
+                        Notifications.success('✓');
+                        loadUsers();
+                    })
+                    .catch(function () { Notifications.error(t('common.error')); });
+            };
+
+            // ── Модал создания ──────────────────────────────
+            var modal     = document.getElementById('createUserModal');
+            var errorMsg  = document.getElementById('createErrorMsg');
+            var submitBtn = document.getElementById('submitCreate');
+
+            document.getElementById('openCreateModal').addEventListener('click', function () {
+                errorMsg.classList.remove('show');
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('newRole').value     = 'Executor';
+                modal.style.display = 'flex';
+                setTimeout(function () { document.getElementById('newUsername').focus(); }, 50);
+            });
+
+            document.getElementById('cancelCreate').addEventListener('click', function () {
+                modal.style.display = 'none';
+            });
+
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) modal.style.display = 'none';
+            });
+
+            submitBtn.addEventListener('click', function () {
+                errorMsg.classList.remove('show');
+                var userName = document.getElementById('newUsername').value.trim();
+                var password = document.getElementById('newPassword').value;
+                var role     = document.getElementById('newRole').value;
+
+                if (!userName) {
+                    errorMsg.textContent = t('user.err_username');
+                    errorMsg.classList.add('show'); return;
+                }
+                if (!password || password.length < 6) {
+                    errorMsg.textContent = t('user.err_password');
+                    errorMsg.classList.add('show'); return;
+                }
+
+                submitBtn.disabled    = true;
+                submitBtn.textContent = t('user.creating');
+
+                // Email не передаём — генерируется на бэкенде
+                API.post('/api/users', { userName: userName, password: password, role: role })
+                    .then(function (res) {
+                        if (!res.ok) return res.json().then(function (e) {
+                            var msgs = e.errors ? e.errors.join(', ') : (e.message || t('common.error'));
+                            throw new Error(msgs);
+                        });
+                        return res.json();
+                    })
+                    .then(function () {
+                        Notifications.success('✓ ' + userName);
+                        modal.style.display = 'none';
+                        loadUsers();
+                    })
+                    .catch(function (err) {
+                        errorMsg.textContent = err.message;
+                        errorMsg.classList.add('show');
+                    })
+                    .finally(function () {
+                        submitBtn.disabled    = false;
+                        submitBtn.textContent = t('user.submit');
+                    });
+            });
+
+            document.addEventListener('tm:langChanged', function () {
+                I18n.applyToPage();
+                localizeRoleOptions();
+                loadUsers();
+            });
+
             loadUsers();
-        } catch (err) {
-            errorMsg.textContent = err.message;
-            errorMsg.classList.add('show');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = t('user.submit');
-        }
-    });
-
-    // ── Реакция на смену языка ──────────────────────────────
-    document.addEventListener('tm:langChanged', () => {
-        I18n.applyToPage();
-        loadUsers(); // перерисовать с новыми переводами кнопок
-    });
-
-    loadUsers();
-});
-</script>
+        });
+    </script>
 }

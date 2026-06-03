@@ -24,6 +24,7 @@ namespace TicketMonitor.Api.Controllers
                 .Where(c => c.Type == ClaimTypes.Role)
                 .Select(c => c.Value);
 
+        // Все аутентифицированные — включая Executor (видит только свои через сервис)
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] int page = 1,
@@ -32,11 +33,7 @@ namespace TicketMonitor.Api.Controllers
             [FromQuery] string? priority = null,
             [FromQuery] string? search = null)
         {
-            // Передаём userId и роли — сервис сам решает что показывать
-            return Ok(await _svc.GetAllAsync(
-                UserId, UserRoles,
-                page, pageSize,
-                status, priority, search));
+            return Ok(await _svc.GetAllAsync(UserId, UserRoles, page, pageSize, status, priority, search));
         }
 
         [HttpGet("{id}")]
@@ -48,51 +45,42 @@ namespace TicketMonitor.Api.Controllers
 
         [HttpGet("{id}/comments")]
         public async Task<IActionResult> GetComments(int id)
-        {
-            return Ok(await _svc.GetCommentsAsync(id));
-        }
+            => Ok(await _svc.GetCommentsAsync(id));
 
+        // Executor НЕ может создавать тикеты
         [HttpPost]
-        [Authorize(Roles = "Manager,Client,Administrator")]
+        [Authorize(Roles = "Manager,Administrator")]
         public async Task<IActionResult> Create([FromBody] CreateTicketDto dto)
         {
             var res = await _svc.CreateAsync(dto, UserId);
             return CreatedAtAction(nameof(GetById), new { id = res.Id }, res);
         }
 
-        // Executor УДАЛЁН — только Manager и Administrator
+        // Executor может менять статус своих тикетов
         [HttpPut("{id}/status")]
-        [Authorize(Roles = "Manager,Administrator")]
+        [Authorize(Roles = "Manager,Executor,Administrator")]
         public async Task<IActionResult> ChangeStatus(int id, [FromBody] ChangeStatusDto dto)
-        {
-            return await _svc.ChangeStatusAsync(id, dto, UserId) ? Ok() : NotFound();
-        }
+            => await _svc.ChangeStatusAsync(id, dto, UserId) ? Ok() : NotFound();
 
+        // Назначать может только Manager / Administrator
         [HttpPut("{id}/assign")]
         [Authorize(Roles = "Manager,Administrator")]
         public async Task<IActionResult> Assign(int id, [FromBody] AssignTicketDto dto)
-        {
-            return await _svc.AssignAsync(id, dto, UserId) ? Ok() : NotFound();
-        }
+            => await _svc.AssignAsync(id, dto, UserId) ? Ok() : NotFound();
 
+        // Комментировать может любой аутентифицированный
         [HttpPost("{id}/comments")]
         public async Task<IActionResult> AddComment(int id, [FromBody] AddCommentDto dto)
-        {
-            return Ok(await _svc.AddCommentAsync(id, dto, UserId));
-        }
+            => Ok(await _svc.AddCommentAsync(id, dto, UserId));
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "Manager,Administrator")]
         public async Task<IActionResult> Delete(int id)
-        {
-            return await _svc.DeleteAsync(id, UserId) ? NoContent() : NotFound();
-        }
+            => await _svc.DeleteAsync(id, UserId) ? NoContent() : NotFound();
 
         [HttpGet("stats")]
         [Authorize(Roles = "Administrator,Manager")]
         public async Task<IActionResult> GetStats()
-        {
-            return Ok(await _svc.GetStatsAsync());
-        }
+            => Ok(await _svc.GetStatsAsync());
     }
 }

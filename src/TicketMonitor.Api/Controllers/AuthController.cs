@@ -5,7 +5,6 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using TicketMonitor.Core.DTOs;
 using TicketMonitor.Core.Entities;
 
 namespace TicketMonitor.Api.Controllers
@@ -47,13 +46,7 @@ namespace TicketMonitor.Api.Controllers
             return Ok(new
             {
                 token,
-                user = new
-                {
-                    id = user.Id,
-                    username = user.UserName,
-                    email = user.Email,
-                    roles
-                }
+                user = new { id = user.Id, username = user.UserName, roles }
             });
         }
 
@@ -72,19 +65,8 @@ namespace TicketMonitor.Api.Controllers
             var user = await _userManager.FindByIdAsync(userId!);
             if (user == null) return Unauthorized();
             var roles = await _userManager.GetRolesAsync(user);
-            return Ok(new
-            {
-                id = user.Id,
-                username = user.UserName,
-                email = user.Email,
-                roles
-            });
+            return Ok(new { id = user.Id, username = user.UserName, roles });
         }
-
-        // ──────────────────────────────────────────────────────────────
-        // Публичная регистрация УДАЛЕНА.
-        // Создание пользователей — только через UsersController (Admin).
-        // ──────────────────────────────────────────────────────────────
 
         private string GenerateJwt(ApplicationUser user, IList<string> roles)
         {
@@ -95,7 +77,7 @@ namespace TicketMonitor.Api.Controllers
             var claims = new List<Claim>
             {
                 new(ClaimTypes.NameIdentifier, user.Id),
-                new(ClaimTypes.Name, user.UserName ?? ""),
+                new(ClaimTypes.Name,           user.UserName ?? ""),
                 new(JwtRegisteredClaimNames.Sub, user.Id),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             };
@@ -110,8 +92,7 @@ namespace TicketMonitor.Api.Controllers
                 audience: _config["Jwt:Audience"] ?? "TicketMonitor",
                 claims: claims,
                 expires: DateTime.UtcNow.AddHours(expireHours),
-                signingCredentials: creds
-            );
+                signingCredentials: creds);
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
