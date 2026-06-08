@@ -36,7 +36,7 @@ namespace TicketMonitor.Api
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddDefaultTokenProviders();
 
-            // JWT Authentication
+            // JWT Ауттентификация
             var jwtKey = builder.Configuration["Jwt:Key"] ?? "SuperSecretKeyThatIsAtLeast32CharactersLong!";
             var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "TicketMonitor";
             var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "TicketMonitor";
@@ -60,7 +60,7 @@ namespace TicketMonitor.Api
                     ClockSkew = TimeSpan.Zero
                 };
 
-                // Support JWT in SignalR
+                // Поддержка JWT в SignalR
                 options.Events = new JwtBearerEvents
                 {
                     OnMessageReceived = context =>

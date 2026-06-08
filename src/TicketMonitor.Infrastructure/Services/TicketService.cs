@@ -14,7 +14,7 @@ namespace TicketMonitor.Infrastructure.Services
         private readonly ITicketNotificationService _notificationService;
         private readonly UserManager<ApplicationUser> _userManager;
 
-        // Роли с полным доступом ко всем тикетам
+        //Роли с полным доступом ко всем тикетам
         private static readonly string[] FullAccessRoles = { "Administrator", "Manager" };
 
         public TicketService(
@@ -27,6 +27,7 @@ namespace TicketMonitor.Infrastructure.Services
             _userManager = userManager;
         }
 
+        //Получает постраничный список тикетов с фильтрацией по роли, статусу, приоритету и поисковой строке.
         public async Task<PagedResult<TicketDto>> GetAllAsync(
             string callerUserId,
             IEnumerable<string> callerRoles,
@@ -44,13 +45,9 @@ namespace TicketMonitor.Infrastructure.Services
                 .Include(t => t.AssignedTo)
                 .AsQueryable();
 
-            // Клиенты видят только созданные ими тикеты + назначенные им
-            // Менеджеры/Администраторы видят все тикеты
             bool hasFullAccess = callerRoles.Any(r => FullAccessRoles.Contains(r));
             if (!hasFullAccess)
             {
-                // Executor: только тикеты, назначенные на него
-                // (создавать не может, поэтому CreatedById не учитываем)
                 query = query.Where(t => t.AssignedToId == callerUserId);
             }
 
@@ -81,11 +78,11 @@ namespace TicketMonitor.Infrastructure.Services
                 Total = total,
                 Page = page,
                 PageSize = pageSize,
-                // Флаг для фронтенда: показывать ли пояснение об ограниченном доступе
                 IsFiltered = !hasFullAccess
             };
         }
 
+        //Получает тикет по его уникальному идентификатору.
         public async Task<TicketDto?> GetByIdAsync(int id)
         {
             var ticket = await _context.Tickets
@@ -96,6 +93,7 @@ namespace TicketMonitor.Infrastructure.Services
             return ticket == null ? null : MapToDto(ticket);
         }
 
+        //Получает хронологический список комментариев к конкретному тикету.
         public async Task<IEnumerable<CommentDto>> GetCommentsAsync(int id)
         {
             return await _context.Comments
@@ -111,6 +109,7 @@ namespace TicketMonitor.Infrastructure.Services
                 .ToListAsync();
         }
 
+        //Создает новый тикет и отправляет уведомление о его создании.
         public async Task<TicketDto> CreateAsync(CreateTicketDto dto, string userId)
         {
             var ticket = new Ticket
@@ -130,11 +129,11 @@ namespace TicketMonitor.Infrastructure.Services
                 .FirstAsync(t => t.Id == ticket.Id);
 
             var result = MapToDto(created);
-            await _notificationService
-                .TicketCreated(result);
+            await _notificationService.TicketCreated(result);
             return result;
         }
 
+        //Изменяет статус тикета, фиксирует это в логах и отправляет уведомления.
         public async Task<bool> ChangeStatusAsync(int id, ChangeStatusDto dto, string userId)
         {
             var ticket = await _context.Tickets.FindAsync(id);
@@ -157,17 +156,13 @@ namespace TicketMonitor.Infrastructure.Services
 
             await _context.SaveChangesAsync();
 
-            await _notificationService.StatusChanged(
-                id,
-                oldStatus,
-                dto.NewStatus);
-
-            await _notificationService
-                .TicketUpdated(id);
+            await _notificationService.StatusChanged(id, oldStatus, dto.NewStatus);
+            await _notificationService.TicketUpdated(id);
 
             return true;
         }
 
+        //Назначает исполнителя на тикет (или снимает назначение) с отправкой уведомлений.
         public async Task<bool> AssignAsync(int id, AssignTicketDto dto, string userId)
         {
             var ticket = await _context.Tickets.FindAsync(id);
@@ -182,16 +177,13 @@ namespace TicketMonitor.Infrastructure.Services
             ticket.AssignedToId = string.IsNullOrEmpty(dto.AssigneeId) ? null : dto.AssigneeId;
             await _context.SaveChangesAsync();
 
-            await _notificationService.TicketAssigned(
-                id,
-                dto.AssigneeId);
-
-            await _notificationService
-                .TicketUpdated(id);
+            await _notificationService.TicketAssigned(id, dto.AssigneeId);
+            await _notificationService.TicketUpdated(id);
 
             return true;
         }
 
+        //Добавляет новый комментарий к тикету и отправляет уведомление.
         public async Task<CommentDto> AddCommentAsync(int id, AddCommentDto dto, string userId)
         {
             if (!await _context.Tickets.AnyAsync(t => t.Id == id))
@@ -216,12 +208,11 @@ namespace TicketMonitor.Infrastructure.Services
                 saved.Author.UserName ?? "Unknown",
                 saved.AuthorId, saved.CreatedAt);
 
-            await _notificationService.CommentAdded(
-                id,
-                result);
+            await _notificationService.CommentAdded(id, result);
             return result;
         }
 
+        //Собирает общую статистику по тикетам (в разрезе статусов, приоритетов, исполнителей и среднего времени закрытия).
         public async Task<TicketStatsDto> GetStatsAsync()
         {
             var total = await _context.Tickets.CountAsync();
@@ -253,6 +244,7 @@ namespace TicketMonitor.Infrastructure.Services
             return new TicketStatsDto(total, byStatus, byPriority, byAssignee, Math.Round(avgHours, 2));
         }
 
+        //Мягко удаляет тикет (выставляет флаг IsDeleted) и отправляет уведомление.
         public async Task<bool> DeleteAsync(int id, string userId)
         {
             var ticket = await _context.Tickets.FirstOrDefaultAsync(t => t.Id == id);
@@ -262,11 +254,11 @@ namespace TicketMonitor.Infrastructure.Services
             ticket.DeletedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
-            await _notificationService
-                .TicketDeleted(id);
+            await _notificationService.TicketDeleted(id);
             return true;
         }
 
+        //Возвращает список всех зарегистрированных пользователей системы.>
         public async Task<IEnumerable<UserDto>> GetUsersAsync()
         {
             var users = await _userManager.Users.ToListAsync();
@@ -279,6 +271,7 @@ namespace TicketMonitor.Infrastructure.Services
             return result;
         }
 
+        //Вспомогательный метод для маппинга сущности Ticket в DTO-модель TicketDto.
         private static TicketDto MapToDto(Ticket t) => new(
             t.Id, t.Title, t.Description,
             t.Status, t.Priority,

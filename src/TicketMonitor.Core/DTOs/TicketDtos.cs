@@ -16,15 +16,22 @@ namespace TicketMonitor.Core.DTOs
 
     public record CommentDto(int Id, string Text, string AuthorName, string AuthorId, DateTime CreatedAt);
 
+    // Баг 2: Roles возвращены обратно — без них фронтенд не знает роль пользователя
+    public record UserDto(string Id, string UserName, IList<string> Roles);
+
+    public record StatusLogDto(
+        int Id,
+        string OldStatus,
+        string NewStatus,
+        string ChangedByName,
+        DateTime Timestamp);
+
     public record TicketStatsDto(
         int Total,
         Dictionary<string, int> ByStatus,
         Dictionary<string, int> ByPriority,
         Dictionary<string, int> ByAssignee,
         double AvgResolutionHours);
-
-    // Email удалён из UserDto — не используется в интерфейсе
-    public record UserDto(string Id, string UserName);
 
     // Email удалён из CreateUserRequest — генерируется автоматически
     public record CreateUserRequest(string UserName, string Password, string Role);

@@ -15,7 +15,6 @@ namespace TicketMonitor.Api.Controllers
         private readonly ITicketService _svc;
         private readonly UserManager<ApplicationUser> _userManager;
 
-        // Client удалён, Executor возвращён
         private static readonly string[] AllowedRoles = { "Administrator", "Manager", "Executor" };
 
         public UsersController(ITicketService svc, UserManager<ApplicationUser> userManager)
@@ -24,15 +23,13 @@ namespace TicketMonitor.Api.Controllers
             _userManager = userManager;
         }
 
+        //Получить всех пользователей
         [HttpGet]
         [Authorize(Roles = "Administrator,Manager")]
         public async Task<IActionResult> GetAll()
             => Ok(await _svc.GetUsersAsync());
 
-        /// <summary>
-        /// Создание пользователя администратором.
-        /// Email не принимается — генерируется автоматически как username@local.tier.
-        /// </summary>
+        //Создать нового пользователя
         [HttpPost]
         [Authorize(Roles = "Administrator")]
         public async Task<IActionResult> Create([FromBody] CreateUserRequest request)
@@ -46,7 +43,6 @@ namespace TicketMonitor.Api.Controllers
             if (!AllowedRoles.Contains(request.Role))
                 return BadRequest(new { message = $"Недопустимая роль" });
 
-            // Email всегда генерируется автоматически — не выводится в UI
             var generatedEmail = $"{request.UserName.Trim().ToLower()}@local.tier";
 
             var user = new ApplicationUser
@@ -67,6 +63,7 @@ namespace TicketMonitor.Api.Controllers
             return CreatedAtAction(nameof(GetAll), new UserDto(user.Id, user.UserName ?? ""));
         }
 
+        //Изменить роль пользователя
         [HttpPut("{id}/role")]
         [Authorize(Roles = "Administrator")]
         public async Task<IActionResult> ChangeRole(string id, [FromBody] ChangeRoleRequest request)
@@ -83,6 +80,7 @@ namespace TicketMonitor.Api.Controllers
             return Ok();
         }
 
+        //Удалить пользователя
         [HttpDelete("{id}")]
         [Authorize(Roles = "Administrator")]
         public async Task<IActionResult> Delete(string id)

@@ -47,7 +47,7 @@ namespace TicketMonitor.Infrastructure.Services
                 await roleManager.DeleteAsync(clientRole);
             }
 
-            // Дефолтный admin
+            // Создание роли администратора по умолчанию, если он отсутствует в базе данных
             if (!await userManager.Users.AnyAsync(u => u.UserName == "admin", cancellationToken))
             {
                 var admin = new ApplicationUser
@@ -56,7 +56,7 @@ namespace TicketMonitor.Infrastructure.Services
                     Email = "admin@local.tier",
                     EmailConfirmed = true
                 };
-                var res = await userManager.CreateAsync(admin, "Admin123!");
+                var res = await userManager.CreateAsync(admin, "xKGl1MvrWwdX3MVp9CdP");
                 if (res.Succeeded)
                     await userManager.AddToRoleAsync(admin, "Administrator");
             }
