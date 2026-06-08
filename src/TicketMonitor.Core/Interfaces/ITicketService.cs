@@ -4,13 +4,6 @@ namespace TicketMonitor.Core.Interfaces
 {
     public interface ITicketService
     {
-        /// <summary>
-        /// Возвращает тикеты с учётом роли вызывающего.
-        /// Клиенты видят все тикеты (они создатели).
-        /// Менеджеры/Администраторы видят все тикеты.
-        /// Работники (Client-роль без менеджера) — только назначенные им.
-        /// Логика фильтрации реализована через callerRoles + callerUserId.
-        /// </summary>
         Task<PagedResult<TicketDto>> GetAllAsync(
             string callerUserId,
             IEnumerable<string> callerRoles,
@@ -22,6 +15,10 @@ namespace TicketMonitor.Core.Interfaces
 
         Task<TicketDto?> GetByIdAsync(int id);
         Task<IEnumerable<CommentDto>> GetCommentsAsync(int id);
+
+        // Баг 1: новый метод для журнала статусов
+        Task<IEnumerable<StatusLogDto>> GetStatusLogsAsync(int id);
+
         Task<TicketDto> CreateAsync(CreateTicketDto dto, string userId);
         Task<bool> ChangeStatusAsync(int id, ChangeStatusDto dto, string userId);
         Task<bool> AssignAsync(int id, AssignTicketDto dto, string userId);

@@ -43,6 +43,7 @@ namespace TicketMonitor.Api.Controllers
             if (!AllowedRoles.Contains(request.Role))
                 return BadRequest(new { message = $"Недопустимая роль" });
 
+            // Email всегда генерируется автоматически — не выводится в UI
             var generatedEmail = $"{request.UserName.Trim().ToLower()}@local.tier";
 
             var user = new ApplicationUser
@@ -60,7 +61,8 @@ namespace TicketMonitor.Api.Controllers
             }
 
             await _userManager.AddToRoleAsync(user, request.Role);
-            return CreatedAtAction(nameof(GetAll), new UserDto(user.Id, user.UserName ?? ""));
+            var roles = await _userManager.GetRolesAsync(user);
+            return CreatedAtAction(nameof(GetAll), new UserDto(user.Id, user.UserName ?? "", roles));
         }
 
         //Изменить роль пользователя

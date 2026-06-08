@@ -162,6 +162,21 @@ namespace TicketMonitor.Infrastructure.Services
             return true;
         }
 
+        public async Task<IEnumerable<StatusLogDto>> GetStatusLogsAsync(int id)
+        {
+            return await _context.StatusLogs
+                .Include(s => s.ChangedBy)
+                .Where(s => s.TicketId == id)
+                .OrderByDescending(s => s.Timestamp)
+                .Select(s => new StatusLogDto(
+                    s.Id,
+                    s.OldStatus.ToString(),
+                    s.NewStatus.ToString(),
+                    s.ChangedBy.UserName ?? "Unknown",
+                    s.Timestamp))
+                .ToListAsync();
+        }
+
         //Назначает исполнителя на тикет (или снимает назначение) с отправкой уведомлений.
         public async Task<bool> AssignAsync(int id, AssignTicketDto dto, string userId)
         {
@@ -258,7 +273,7 @@ namespace TicketMonitor.Infrastructure.Services
             return true;
         }
 
-        //Возвращает список всех зарегистрированных пользователей системы.>
+        // Баг 2 исправлен: roles передаётся в UserDto
         public async Task<IEnumerable<UserDto>> GetUsersAsync()
         {
             var users = await _userManager.Users.ToListAsync();
@@ -266,7 +281,7 @@ namespace TicketMonitor.Infrastructure.Services
             foreach (var u in users)
             {
                 var roles = await _userManager.GetRolesAsync(u);
-                result.Add(new UserDto(u.Id, u.UserName ?? ""));
+                result.Add(new UserDto(u.Id, u.UserName ?? "", roles));
             }
             return result;
         }

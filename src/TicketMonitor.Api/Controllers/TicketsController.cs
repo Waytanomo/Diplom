@@ -24,7 +24,6 @@ namespace TicketMonitor.Api.Controllers
                 .Where(c => c.Type == ClaimTypes.Role)
                 .Select(c => c.Value);
 
-        //Получить все тикеты
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] int page = 1,
@@ -36,7 +35,6 @@ namespace TicketMonitor.Api.Controllers
             return Ok(await _svc.GetAllAsync(UserId, UserRoles, page, pageSize, status, priority, search));
         }
 
-        //Получить конкретный контроллер
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -44,12 +42,15 @@ namespace TicketMonitor.Api.Controllers
             return ticket is null ? NotFound() : Ok(ticket);
         }
 
-        //Получить комментарии для тикета
         [HttpGet("{id}/comments")]
         public async Task<IActionResult> GetComments(int id)
             => Ok(await _svc.GetCommentsAsync(id));
 
-        //Создать тикет
+        // Баг 1: новый эндпоинт журнала статусов
+        [HttpGet("{id}/statuslogs")]
+        public async Task<IActionResult> GetStatusLogs(int id)
+            => Ok(await _svc.GetStatusLogsAsync(id));
+
         [HttpPost]
         [Authorize(Roles = "Manager,Administrator")]
         public async Task<IActionResult> Create([FromBody] CreateTicketDto dto)
@@ -58,30 +59,25 @@ namespace TicketMonitor.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = res.Id }, res);
         }
 
-        //Изменить статус тикета
         [HttpPut("{id}/status")]
         [Authorize(Roles = "Manager,Executor,Administrator")]
         public async Task<IActionResult> ChangeStatus(int id, [FromBody] ChangeStatusDto dto)
             => await _svc.ChangeStatusAsync(id, dto, UserId) ? Ok() : NotFound();
 
-        //Прикрепить пользователя к тикету
         [HttpPut("{id}/assign")]
         [Authorize(Roles = "Manager,Administrator")]
         public async Task<IActionResult> Assign(int id, [FromBody] AssignTicketDto dto)
             => await _svc.AssignAsync(id, dto, UserId) ? Ok() : NotFound();
 
-        //Добавить комментарий
         [HttpPost("{id}/comments")]
         public async Task<IActionResult> AddComment(int id, [FromBody] AddCommentDto dto)
             => Ok(await _svc.AddCommentAsync(id, dto, UserId));
 
-        //Удалить тикет
         [HttpDelete("{id}")]
         [Authorize(Roles = "Manager,Administrator")]
         public async Task<IActionResult> Delete(int id)
             => await _svc.DeleteAsync(id, UserId) ? NoContent() : NotFound();
 
-        //Получить статистику
         [HttpGet("stats")]
         [Authorize(Roles = "Administrator,Manager")]
         public async Task<IActionResult> GetStats()

@@ -10,7 +10,7 @@
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
                 <a asp-controller="TicketsPage" asp-action="Index"
                    class="tm-btn tm-btn-ghost tm-btn-sm" style="padding:4px 10px"
-                   data-i18n="ticket.back">← Back</a>
+                   data-i18n="ticket.back">Back</a>
                 <span class="ticket-id" id="ticketId"></span>
             </div>
             <h1 class="page-title" id="ticketTitle" style="font-size:1.5rem"></h1>
@@ -23,8 +23,7 @@
         <div>
             <div class="tm-card" style="margin-bottom:24px">
                 <div class="tm-card-header">
-                    <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;
-                    letter-spacing:0.08em;color:var(--text-muted)"
+                    <span style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted)"
                           data-i18n="ticket.description">Description</span>
                 </div>
                 <div class="tm-card-body">
@@ -47,16 +46,14 @@
                     </div>
                     <div class="comment-form" style="margin-top:20px">
                         <textarea class="tm-textarea" id="commentText"
-                                  data-i18n-placeholder="comments.placeholder"
-                                  placeholder="Write a comment…"
-                                  rows="3" style="min-height:80px"></textarea>
+                            data-i18n-placeholder="comments.placeholder"
+                            placeholder="Write a comment…"
+                            rows="3" style="min-height:80px"></textarea>
                         <div style="display:flex;justify-content:space-between;align-items:center">
                             <span style="font-size:0.75rem;color:var(--text-muted)"
                                   data-i18n="comments.hint">Ctrl+Enter to submit</span>
                             <button class="tm-btn tm-btn-primary tm-btn-sm"
-                                    id="submitComment" data-i18n="comments.post">
-                                Post Comment
-                            </button>
+                                id="submitComment" data-i18n="comments.post">Post Comment</button>
                         </div>
                     </div>
                 </div>
@@ -78,10 +75,8 @@
                     <option value="3" data-i18n="status.Closed">Closed</option>
                 </select>
                 <button class="tm-btn tm-btn-secondary tm-btn-sm" id="changeStatusBtn"
-                        style="width:100%;justify-content:center"
-                        data-i18n="ticket.update_status">
-                    Update Status
-                </button>
+                    style="width:100%;justify-content:center"
+                    data-i18n="ticket.update_status">Update Status</button>
             </div>
 
             <div class="sidebar-section" id="assignSection" style="display:none">
@@ -90,19 +85,15 @@
                     <option value="" data-i18n="common.unassigned">Unassigned</option>
                 </select>
                 <button class="tm-btn tm-btn-secondary tm-btn-sm" id="assignBtn"
-                        style="width:100%;justify-content:center"
-                        data-i18n="ticket.assign_btn">
-                    Assign
-                </button>
+                    style="width:100%;justify-content:center"
+                    data-i18n="ticket.assign_btn">Assign</button>
             </div>
 
             <div class="sidebar-section">
                 <div class="sidebar-section-title" data-i18n="ticket.history">Status History</div>
                 <div id="statusLogContainer" class="status-log">
                     <div style="color:var(--text-muted);font-size:0.8rem"
-                         data-i18n="ticket.no_history">
-                        No history yet
-                    </div>
+                         data-i18n="ticket.no_history">No history yet</div>
                 </div>
             </div>
         </div>
@@ -116,207 +107,234 @@
            data-i18n="ticket.delete_warning">This action cannot be undone.</p>
         <div class="modal-footer">
             <button class="tm-btn tm-btn-secondary"
-                    onclick="document.getElementById('deleteModal').style.display='none'"
-                    data-i18n="ticket.cancel">
-                Cancel
-            </button>
+                onclick="document.getElementById('deleteModal').style.display='none'"
+                data-i18n="ticket.cancel">Cancel</button>
             <button class="tm-btn tm-btn-danger" id="confirmDelete"
-                    data-i18n="ticket.delete">
-                Delete
-            </button>
+                data-i18n="ticket.delete">Delete</button>
         </div>
     </div>
 </div>
 
 @section Scripts {
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            requireAuth();
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    requireAuth();
 
-            var ticketId   = parseInt(location.pathname.split('/').pop());
-            if (!ticketId) return;
+    var ticketId   = parseInt(location.pathname.split('/').pop());
+    if (!ticketId) return;
 
-            var canManage = Auth.hasAnyRole('Manager', 'Administrator');
-            var currentTicket = null;
+    var canManage  = Auth.hasAnyRole('Manager', 'Administrator');
+    var canStatus  = Auth.hasAnyRole('Manager', 'Executor', 'Administrator');
+    var currentTicket = null;
 
-            function loadTicket() {
-                return API.get('/api/tickets/' + ticketId)
-                    .then(function (res) {
-                        if (res.status === 404) {
-                            document.getElementById('loadingWrap').innerHTML =
-                                '<div class="empty-state"><div class="empty-icon">404</div>' +
-                                '<div class="empty-text">Ticket not found</div></div>';
-                            return null;
-                        }
-                        return res.json();
-                    })
-                    .then(function (ticket) {
-                        if (ticket) { currentTicket = ticket; renderTicket(ticket); }
-                    })
-                    .catch(function () { Notifications.error(t('common.error')); });
-            }
-
-            function loadComments() {
-                return API.get('/api/tickets/' + ticketId + '/comments')
-                    .then(function (res) { return res.json(); })
-                    .then(function (comments) { renderComments(comments); })
-                    .catch(function () {});
-            }
-
-            function loadUsers() {
-                if (!canManage) return;
-                API.get('/api/users')
-                    .then(function (res) { return res.ok ? res.json() : []; })
-                    .then(function (users) {
-                        var sel = document.getElementById('assigneeSelect');
-                        sel.innerHTML = '<option value="">' + t('common.unassigned') + '</option>' +
-                            users.map(function (u) {
-                                return '<option value="' + u.id + '">' + Helpers.escapeHtml(u.userName) + '</option>';
-                            }).join('');
-                        if (currentTicket && currentTicket.assignedToId)
-                            sel.value = currentTicket.assignedToId;
-                    })
-                    .catch(function () {});
-            }
-
-            function renderTicket(ticket) {
-                document.getElementById('loadingWrap').style.display = 'none';
-                document.getElementById('content').style.display    = '';
-                document.getElementById('ticketId').textContent     = '#' + ticket.id;
-                document.getElementById('ticketTitle').textContent  = ticket.title;
-                document.getElementById('ticketDesc').textContent   = ticket.description;
-                document.getElementById('metaBadges').innerHTML =
-                    Helpers.statusBadge(ticket.status) + ' ' + Helpers.priorityBadge(ticket.priority);
-
-                document.getElementById('ticketMeta').innerHTML =
-                    '<div class="meta-row">' +
-                        '<span class="meta-key">'  + t('ticket.created_by') + '</span>' +
-                        '<span class="meta-val">'  + Helpers.escapeHtml(ticket.createdByName) + '</span>' +
-                    '</div>' +
-                    '<div class="meta-row">' +
-                        '<span class="meta-key">'  + t('ticket.assigned_to') + '</span>' +
-                        '<span class="meta-val">'  + (ticket.assignedToName
-                            ? Helpers.escapeHtml(ticket.assignedToName)
-                            : '<span style="color:var(--text-muted)">' + t('common.unassigned') + '</span>') + '</span>' +
-                    '</div>' +
-                    '<div class="meta-row">' +
-                        '<span class="meta-key">'  + t('ticket.created_at') + '</span>' +
-                        '<span class="meta-val">'  + Helpers.formatDateTime(ticket.createdAt) + '</span>' +
-                    '</div>' +
-                    (ticket.closedAt
-                        ? '<div class="meta-row">' +
-                            '<span class="meta-key">'  + t('ticket.closed_at') + '</span>' +
-                            '<span class="meta-val">'  + Helpers.formatDateTime(ticket.closedAt) + '</span>' +
-                          '</div>'
-                        : '');
-
-                var actionBtns = document.getElementById('actionBtns');
-                actionBtns.innerHTML = '';
-                if (canManage) {
-                    var btn = document.createElement('button');
-                    btn.className   = 'tm-btn tm-btn-danger tm-btn-sm';
-                    btn.textContent = t('ticket.delete');
-                    btn.addEventListener('click', function () {
-                        document.getElementById('deleteModal').style.display = 'flex';
-                    });
-                    actionBtns.appendChild(btn);
+    function loadTicket() {
+        return API.get('/api/tickets/' + ticketId)
+            .then(function (res) {
+                if (res.status === 404) {
+                    document.getElementById('loadingWrap').innerHTML =
+                        '<div class="empty-state"><div class="empty-icon">404</div>' +
+                        '<div class="empty-text">Ticket not found</div></div>';
+                    return null;
                 }
+                return res.json();
+            })
+            .then(function (ticket) {
+                if (ticket) { currentTicket = ticket; renderTicket(ticket); }
+            })
+            .catch(function () { Notifications.error(t('common.error')); });
+    }
 
-                if (canManage) {
-                    document.getElementById('statusSection').style.display = '';
-                    document.getElementById('assignSection').style.display = '';
-                    var statusMap = { Open: 0, InProgress: 1, Resolved: 2, Closed: 3 };
-                    document.getElementById('newStatus').value = statusMap[ticket.status] || 0;
-                    loadUsers();
-                }
-            }
+    function loadComments() {
+        return API.get('/api/tickets/' + ticketId + '/comments')
+            .then(function (res) { return res.json(); })
+            .then(function (comments) { renderComments(comments); })
+            .catch(function () {});
+    }
 
-            function renderComments(comments) {
-                var list      = document.getElementById('commentList');
-                var noComments = document.getElementById('noComments');
-                document.getElementById('commentCount').textContent = comments.length;
-                if (!comments.length) { list.innerHTML = ''; noComments.style.display = ''; return; }
-                noComments.style.display = 'none';
-                list.innerHTML = comments.map(function (c) {
-                    return '<div class="comment-item">' +
-                        '<div class="comment-header">' +
-                            '<div class="comment-avatar">' +
-                                Helpers.escapeHtml((c.authorName[0] || '?').toUpperCase()) +
-                            '</div>' +
-                            '<span class="comment-author">' + Helpers.escapeHtml(c.authorName) + '</span>' +
-                            '<span class="comment-time">' + Helpers.timeAgo(c.createdAt) + '</span>' +
-                        '</div>' +
-                        '<div class="comment-text">' + Helpers.escapeHtml(c.text) + '</div>' +
-                        '</div>';
-                }).join('');
-            }
+    function loadStatusLogs() {
+        return API.get('/api/tickets/' + ticketId + '/statuslogs')
+            .then(function (res) { return res.json(); })
+            .then(function (logs) { renderStatusLogs(logs); })
+            .catch(function () {});
+    }
 
-            document.getElementById('changeStatusBtn').addEventListener('click', function () {
-                var newStatus = parseInt(document.getElementById('newStatus').value);
-                var btn = this; btn.disabled = true; btn.textContent = t('common.loading');
-                API.put('/api/tickets/' + ticketId + '/status', { newStatus: newStatus })
-                    .then(function (res) {
-                        if (!res.ok) throw new Error();
-                        Notifications.success('✓');
-                        return loadTicket();
-                    })
-                    .catch(function () { Notifications.error(t('common.error')); })
-                    .finally(function () { btn.disabled = false; btn.textContent = t('ticket.update_status'); });
+    function loadUsers() {
+        if (!canManage) return;
+        API.get('/api/users')
+            .then(function (res) { return res.ok ? res.json() : []; })
+            .then(function (users) {
+                var sel = document.getElementById('assigneeSelect');
+                sel.innerHTML = '<option value="">' + t('common.unassigned') + '</option>' +
+                    users.map(function (u) {
+                        return '<option value="' + u.id + '">' + Helpers.escapeHtml(u.userName) + '</option>';
+                    }).join('');
+                if (currentTicket && currentTicket.assignedToId)
+                    sel.value = currentTicket.assignedToId;
+            })
+            .catch(function () {});
+    }
+
+    function renderTicket(ticket) {
+        document.getElementById('loadingWrap').style.display = 'none';
+        document.getElementById('content').style.display    = '';
+        document.getElementById('ticketId').textContent     = '#' + ticket.id;
+        document.getElementById('ticketTitle').textContent  = ticket.title;
+        document.getElementById('ticketDesc').textContent   = ticket.description;
+        document.getElementById('metaBadges').innerHTML =
+            Helpers.statusBadge(ticket.status) + ' ' + Helpers.priorityBadge(ticket.priority);
+
+        document.getElementById('ticketMeta').innerHTML =
+            '<div class="meta-row"><span class="meta-key">' + t('ticket.created_by') + '</span>' +
+            '<span class="meta-val">' + Helpers.escapeHtml(ticket.createdByName) + '</span></div>' +
+            '<div class="meta-row"><span class="meta-key">' + t('ticket.assigned_to') + '</span>' +
+            '<span class="meta-val">' + (ticket.assignedToName
+                ? Helpers.escapeHtml(ticket.assignedToName)
+                : '<span style="color:var(--text-muted)">' + t('common.unassigned') + '</span>') + '</span></div>' +
+            '<div class="meta-row"><span class="meta-key">' + t('ticket.created_at') + '</span>' +
+            '<span class="meta-val">' + Helpers.formatDateTime(ticket.createdAt) + '</span></div>' +
+            (ticket.closedAt
+                ? '<div class="meta-row"><span class="meta-key">' + t('ticket.closed_at') + '</span>' +
+                  '<span class="meta-val">' + Helpers.formatDateTime(ticket.closedAt) + '</span></div>'
+                : '');
+
+        var actionBtns = document.getElementById('actionBtns');
+        actionBtns.innerHTML = '';
+        if (canManage) {
+            var btn = document.createElement('button');
+            btn.className   = 'tm-btn tm-btn-danger tm-btn-sm';
+            btn.textContent = t('ticket.delete');
+            btn.addEventListener('click', function () {
+                document.getElementById('deleteModal').style.display = 'flex';
             });
+            actionBtns.appendChild(btn);
+        }
 
-            document.getElementById('assignBtn').addEventListener('click', function () {
-                var assigneeId = document.getElementById('assigneeSelect').value || null;
-                var btn = this; btn.disabled = true; btn.textContent = t('common.loading');
-                API.put('/api/tickets/' + ticketId + '/assign', { assigneeId: assigneeId })
-                    .then(function (res) {
-                        if (!res.ok) throw new Error();
-                        Notifications.success('✓');
-                        return loadTicket();
-                    })
-                    .catch(function () { Notifications.error(t('common.error')); })
-                    .finally(function () { btn.disabled = false; btn.textContent = t('ticket.assign_btn'); });
-            });
+        if (canStatus) {
+            document.getElementById('statusSection').style.display = '';
+            var statusMap = { Open: 0, InProgress: 1, Resolved: 2, Closed: 3 };
+            document.getElementById('newStatus').value = statusMap[ticket.status] || 0;
+        }
+        if (canManage) {
+            document.getElementById('assignSection').style.display = '';
+            loadUsers();
+        }
+    }
 
-            document.getElementById('submitComment').addEventListener('click', function () {
-                var text = document.getElementById('commentText').value.trim();
-                if (!text) return;
-                var btn = this; btn.disabled = true; btn.textContent = t('comments.posting');
-                API.post('/api/tickets/' + ticketId + '/comments', { text: text })
-                    .then(function (res) {
-                        if (!res.ok) throw new Error();
-                        document.getElementById('commentText').value = '';
-                        return loadComments();
-                    })
-                    .catch(function () { Notifications.error(t('common.error')); })
-                    .finally(function () { btn.disabled = false; btn.textContent = t('comments.post'); });
-            });
+    function renderComments(comments) {
+        var list       = document.getElementById('commentList');
+        var noComments = document.getElementById('noComments');
+        document.getElementById('commentCount').textContent = comments.length;
+        if (!comments.length) { list.innerHTML = ''; noComments.style.display = ''; return; }
+        noComments.style.display = 'none';
+        list.innerHTML = comments.map(function (c) {
+            return '<div class="comment-item">' +
+                '<div class="comment-header">' +
+                    '<div class="comment-avatar">' + Helpers.escapeHtml((c.authorName[0] || '?').toUpperCase()) + '</div>' +
+                    '<span class="comment-author">' + Helpers.escapeHtml(c.authorName) + '</span>' +
+                    '<span class="comment-time">' + Helpers.timeAgo(c.createdAt) + '</span>' +
+                '</div>' +
+                '<div class="comment-text">' + Helpers.escapeHtml(c.text) + '</div>' +
+            '</div>';
+        }).join('');
+    }
 
-            document.getElementById('commentText').addEventListener('keydown', function (e) {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey))
-                    document.getElementById('submitComment').click();
-            });
+    function renderStatusLogs(logs) {
+        var container = document.getElementById('statusLogContainer');
+        if (!logs.length) {
+            container.innerHTML =
+                '<div style="color:var(--text-muted);font-size:0.8rem">' + t('ticket.no_history') + '</div>';
+            return;
+        }
+        container.innerHTML = logs.map(function (log) {
+            return '<div class="status-log-item">' +
+                '<div style="flex:1">' +
+                    '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">' +
+                        Helpers.statusBadge(log.oldStatus) +
+                        '<span class="status-arrow">→</span>' +
+                        Helpers.statusBadge(log.newStatus) +
+                    '</div>' +
+                    '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">' +
+                        Helpers.escapeHtml(log.changedByName) + ' · ' + Helpers.timeAgo(log.timestamp) +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
 
-            document.getElementById('confirmDelete').addEventListener('click', function () {
-                document.getElementById('deleteModal').style.display = 'none';
-                API.delete('/api/tickets/' + ticketId)
-                    .then(function (res) {
-                        if (!res.ok) throw new Error();
-                        Notifications.success('✓');
-                        setTimeout(function () { window.location.href = '/TicketsPage'; }, 800);
-                    })
-                    .catch(function () { Notifications.error(t('common.error')); });
-            });
+    document.getElementById('changeStatusBtn').addEventListener('click', function () {
+        var newStatus = parseInt(document.getElementById('newStatus').value);
+        var btn = this; btn.disabled = true; btn.textContent = t('common.loading');
+        API.put('/api/tickets/' + ticketId + '/status', { newStatus: newStatus })
+            .then(function (res) {
+                if (!res.ok) throw new Error();
+                Notifications.success('✓');
+                return Promise.all([loadTicket(), loadStatusLogs()]);
+            })
+            .catch(function () { Notifications.error(t('common.error')); })
+            .finally(function () { btn.disabled = false; btn.textContent = t('ticket.update_status'); });
+    });
 
-            document.addEventListener('tm:statusChanged',  function (e) { if (e.detail.ticketId == ticketId) loadTicket(); });
-            document.addEventListener('tm:commentAdded',   function ()  { loadComments(); });
-            document.addEventListener('tm:ticketAssigned', function (e) { if (e.detail.ticketId == ticketId) loadTicket(); });
-            document.addEventListener('tm:langChanged',    function ()  {
-                I18n.applyToPage();
-                if (currentTicket) renderTicket(currentTicket);
-            });
+    document.getElementById('assignBtn').addEventListener('click', function () {
+        var assigneeId = document.getElementById('assigneeSelect').value || null;
+        var btn = this; btn.disabled = true; btn.textContent = t('common.loading');
+        API.put('/api/tickets/' + ticketId + '/assign', { assigneeId: assigneeId })
+            .then(function (res) {
+                if (!res.ok) throw new Error();
+                Notifications.success('✓');
+                return loadTicket();
+            })
+            .catch(function () { Notifications.error(t('common.error')); })
+            .finally(function () { btn.disabled = false; btn.textContent = t('ticket.assign_btn'); });
+    });
 
-            loadTicket().then(function () { return loadComments(); });
-            setTimeout(function () { TM_SignalR.joinTicket(ticketId); }, 1000);
-        });
-    </script>
+    document.getElementById('submitComment').addEventListener('click', function () {
+        var text = document.getElementById('commentText').value.trim();
+        if (!text) return;
+        var btn = this; btn.disabled = true; btn.textContent = t('comments.posting');
+        API.post('/api/tickets/' + ticketId + '/comments', { text: text })
+            .then(function (res) {
+                if (!res.ok) throw new Error();
+                document.getElementById('commentText').value = '';
+                return loadComments();
+            })
+            .catch(function () { Notifications.error(t('common.error')); })
+            .finally(function () { btn.disabled = false; btn.textContent = t('comments.post'); });
+    });
+
+    document.getElementById('commentText').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey))
+            document.getElementById('submitComment').click();
+    });
+
+    document.getElementById('confirmDelete').addEventListener('click', function () {
+        document.getElementById('deleteModal').style.display = 'none';
+        API.delete('/api/tickets/' + ticketId)
+            .then(function (res) {
+                if (!res.ok) throw new Error();
+                Notifications.success('✓');
+                setTimeout(function () { window.location.href = '/TicketsPage'; }, 800);
+            })
+            .catch(function () { Notifications.error(t('common.error')); });
+    });
+
+    document.addEventListener('tm:statusChanged',  function (e) {
+        if (e.detail.ticketId == ticketId) { loadTicket(); loadStatusLogs(); }
+    });
+    document.addEventListener('tm:commentAdded',   function ()  { loadComments(); });
+    document.addEventListener('tm:ticketAssigned', function (e) {
+        if (e.detail.ticketId == ticketId) loadTicket();
+    });
+    document.addEventListener('tm:langChanged',    function ()  {
+        I18n.applyToPage();
+        if (currentTicket) renderTicket(currentTicket);
+        loadStatusLogs();
+    });
+
+    loadTicket().then(function () {
+        return Promise.all([loadComments(), loadStatusLogs()]);
+    });
+
+    setTimeout(function () { TM_SignalR.joinTicket(ticketId); }, 1000);
+});
+</script>
 }
